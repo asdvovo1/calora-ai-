@@ -10,22 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # الخطوة 1: هننزل الكود في فولدر نضيف اسمه source عشان نمنع لخبطة المسارات
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: source
-
-      # الخطوة 2: هنحدد الفولدر اللي كل الأوامر هتشتغل جواه بشكل صريح
-      - name: Set Working Directory
-        run: echo "WORK_DIR=source/calora" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: ${{ env.WORK_DIR }}/package-lock.json
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -33,26 +24,28 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # الخطوة 3: هننزل المكتبات جوه الفولدر الصح
-      - name: Install Dependencies
-        working-directory: ${{ env.WORK_DIR }}
-        run: npm install --legacy-peer-deps
-
       # ===================================================================
-      #  الخطوة 4: الخطوة السحرية اللي كانت ناقصة لمشاريع Expo
+      #  الخطوة الوحيدة اللي هنعمل فيها كل حاجة بالترتيب الصحيح
       # ===================================================================
-      - name: Prebuild and Sync Native Project
-        working-directory: ${{ env.WORK_DIR }}
-        run: npx expo prebuild --platform android --no-install
+      - name: Install, Prebuild, and Assemble APK
+        run: |
+          # 1. ندخل على فولدر المشروع الأساسي عشان كل الأوامر تشتغل صح
+          cd calora
+          
+          # 2. ننزل المكتبات
+          npm install --legacy-peer-deps
+          
+          # 3. نجهز ملفات الأندرويد (الخطوة اللي كانت بتصلح المشكلة)
+          npx expo prebuild --platform android --no-install
+          
+          # 4. ندخل على فولدر الأندرويد ونبني الـ APK
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
-      # الخطوة 5: هنبني الـ APK من الفولدر الصح
-      - name: Build Debug APK
-        working-directory: ${{ env.WORK_DIR }}/android
-        run: ./gradlew assembleDebug
-
-      # الخطوة 6: هنرفع الـ APK من المسار الكامل والصحيح
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: ${{ env.WORK_DIR }}/android/app/build/outputs/apk/debug/*.apk
+          # المسار ده صحيح لأنه بيبدأ من الـ root بتاع المشروع
+          path: calora/android/app/build/outputs/apk/debug/*.apk
