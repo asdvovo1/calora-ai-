@@ -8,6 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # هنا هنحدد الفولدر اللي كل الأوامر هتشتغل جواه
+    defaults:
+      run:
+        working-directory: ./calora
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -23,17 +28,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # بما إننا حددنا working-directory فوق، مش محتاجين نكتب cd calora كل مرة
       - name: Install Dependencies
-        run: cd calora && npm install
+        run: npm install --legacy-peer-deps
 
       - name: Make gradlew executable
-        run: cd calora && chmod +x android/gradlew
+        run: chmod +x android/gradlew
 
-      - name: Build Release APK
-        run: cd calora/android && ./gradlew assembleRelease
+      - name: Build Debug APK
+        # هنبني نسخة Debug عشان أسهل ومش محتاجة توقيع
+        run: cd android && ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: calora/android/app/build/outputs/apk/release/*.apk
+          name: app-debug-apk
+          # هنغير المسار عشان يطابق بناء الـ Debug
+          path: calora/android/app/build/outputs/apk/debug/*.apk
