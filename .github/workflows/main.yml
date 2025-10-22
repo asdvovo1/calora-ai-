@@ -13,10 +13,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # ===================================================================
+      #  هنا التغيير الوحيد والمهم: غيرنا 18 إلى 20
+      # ===================================================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -24,29 +27,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # ===================================================================
-      #  هنا الحل الكامل والنهائي بالترتيب الذهبي
-      # ===================================================================
+      # باقي الخطوات كما هي لأنها كانت صحيحة
       - name: Install Correct Dependencies, Prebuild, and Assemble APK
         run: |
-          # 1. ندخل على فولدر المشروع الأساسي
           cd calora
-          
-          # 2. نمسح أي بقايا قديمة لضمان بداية نظيفة تماماً
-          echo "Deleting old node_modules and package-lock.json..."
           rm -rf node_modules package-lock.json
-          
-          # 3. الخطوة السحرية: نستخدم "npx expo install" بدلاً من "npm install".
-          # هذا الأمر يقرأ package.json وينزل فقط الإصدارات المتوافقة 100%
-          echo "Installing compatible dependencies using 'expo install'..."
           npx expo install
-          
-          # 4. نجهز ملفات الأندرويد بعد أن أصبحت كل المكتبات سليمة ومتوافقة
-          echo "Prebuilding Android project..."
           npx expo prebuild --platform android --no-install
-          
-          # 5. ندخل على فولدر الأندرويد ونبني الـ APK
-          echo "Building Android APK..."
           cd android
           chmod +x ./gradlew
           ./gradlew assembleDebug
