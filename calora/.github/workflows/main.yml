@@ -24,7 +24,7 @@ jobs:
           java-version: '17'
 
       - name: Install Dependencies
-        run: cd calora && npm install
+        run: cd calora && npm install --legacy-peer-deps
 
       - name: Make gradlew executable
         run: cd calora && chmod +x android/gradlew
