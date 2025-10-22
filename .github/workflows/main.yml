@@ -25,20 +25,26 @@ jobs:
           java-version: '17'
 
       # ===================================================================
-      #  الخطوة الوحيدة اللي هنعمل فيها كل حاجة بالترتيب الصحيح
+      #  هنا الحل الكامل والنهائي بالترتيب الصحيح 100%
       # ===================================================================
-      - name: Install, Prebuild, and Assemble APK
+      - name: Install, Fix, Prebuild, and Assemble APK
         run: |
-          # 1. ندخل على فولدر المشروع الأساسي عشان كل الأوامر تشتغل صح
+          # 1. ندخل على فولدر المشروع الأساسي
           cd calora
           
-          # 2. ننزل المكتبات
+          # 2. ننزل المكتبات كخطوة أولى
           npm install --legacy-peer-deps
           
-          # 3. نجهز ملفات الأندرويد (الخطوة اللي كانت بتصلح المشكلة)
+          # 3. الخطوة السحرية: نصلح أي عدم توافق في المكتبات
+          echo "Fixing project dependencies with 'expo install --fix'..."
+          npx expo install --fix
+          
+          # 4. نجهز ملفات الأندرويد بعد ما اتأكدنا إن كل حاجة سليمة
+          echo "Prebuilding Android project..."
           npx expo prebuild --platform android --no-install
           
-          # 4. ندخل على فولدر الأندرويد ونبني الـ APK
+          # 5. ندخل على فولدر الأندرويد ونبني الـ APK
+          echo "Building Android APK..."
           cd android
           chmod +x ./gradlew
           ./gradlew assembleDebug
@@ -47,5 +53,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          # المسار ده صحيح لأنه بيبدأ من الـ root بتاع المشروع
           path: calora/android/app/build/outputs/apk/debug/*.apk
