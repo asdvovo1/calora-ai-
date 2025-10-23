@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. يسحب الكود
+      # 1. يسحب الكود (ومعه فولدر android الجاهز)
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -31,9 +31,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 5. يحول المشروع
-      - name: Prebuild for Android
-        run: npx expo prebuild --platform android
+      # 5. ((((  الخطوة الجديدة والأساسية لحل المشكلة  ))))
+      # يضيف إعداد hermesEnabled لملف الإعدادات
+      - name: Add hermesEnabled flag to gradle.properties
+        run: echo "hermesEnabled=true" >> android/gradle.properties
 
       # 6. يرجع ملف التوقيع
       - name: Decode Keystore
@@ -44,14 +45,7 @@ jobs:
         working-directory: ./android
         run: chmod +x ./gradlew
 
-      # 8. ((((  الخطوة الجديدة والأساسية لحل المشكلة  ))))
-      # ينشئ ملف إعدادات Gradle ويضع فيه المسار الصحيح
-      - name: Create gradle.properties
-        working-directory: ./android
-        run: |
-          echo "expo.autolinking.nodeModulesPath=../node_modules" > gradle.properties
-
-      # 9. يبدأ عملية البناء (من غير أي إضافات في الأمر)
+      # 8. يبدأ عملية البناء
       - name: Build Android Release APK
         working-directory: ./android
         run: ./gradlew assembleRelease
@@ -61,7 +55,7 @@ jobs:
           MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      # 10. يرفع الـ APK
+      # 9. يرفع الـ APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
