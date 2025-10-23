@@ -43,7 +43,7 @@ jobs:
         run: |
           # 1. الخطوة الحاسمة: ندمج التثبيت مع الـ Prebuild
           # الأمر ده هيعمل install للمكتبات وبعدها مباشرة يبني ملفات الأندرويد
-          # ده بيضمن إن Gradle يلاقي كل حاجة بيحتاجها في مكانها الصحيح.
+          # ***لاحظ عدم وجود --no-install هنا***
           echo "Running prebuild which will also install dependencies..."
           npx expo prebuild --platform android
           
