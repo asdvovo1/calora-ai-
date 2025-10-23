@@ -25,22 +25,21 @@ jobs:
           java-version: '17'
 
       # ===================================================================
-      #  الخطوة 4: تثبيت المكتبات (بشكل منفصل وصريح)
+      #  الخطوة 4: تثبيت جميع المكتبات باستخدام NPM (الخطوة الأساسية)
       # ===================================================================
-      - name: Install Project Dependencies
+      - name: Install All Dependencies with NPM
         working-directory: ./calora
         run: |
-          echo "Installing dependencies using the recommended 'npx expo install' command..."
-          npx expo install
+          echo "Installing all dependencies from package-lock.json using 'npm install'..."
+          npm install
 
       # ===================================================================
-      #  الخطوة 5: إنشاء ملفات الأندرويد (الآن بعد أن أصبحت المكتبات موجودة)
+      #  الخطوة 5: إنشاء ملفات الأندرويد (بعد أن أصبح كل شيء مثبتًا)
       # ===================================================================
       - name: Prebuild Android Project
         working-directory: ./calora
         run: |
-          echo "Dependencies installed. Starting prebuild process..."
-          # الآن يمكننا استخدام --no-install بأمان لأننا قمنا بالتثبيت في الخطوة السابقة
+          echo "Dependencies are installed. Starting prebuild process..."
           npx expo prebuild --platform android --no-install
 
       # ===================================================================
