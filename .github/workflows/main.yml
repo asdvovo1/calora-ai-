@@ -10,13 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      # الخطوة 1: هننزل الكود في فولدر نضيف اسمه source عشان نمنع لخبطة المسارات
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          path: source
 
-      - name: Setup Node.js v20
+      # الخطوة 2: هنحدد الفولدر اللي كل الأوامر هتشتغل جواه بشكل صريح
+      - name: Set Working Directory
+        run: echo "WORK_DIR=source/calora" >> $GITHUB_ENV
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORK_DIR }}/package-lock.json
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -24,35 +33,26 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # ===================================================================
-      #  هنا الحل الكامل والنهائي بالترتيب الذهبي
-      # ===================================================================
-      - name: Install Correct Dependencies, Prebuild, and Assemble APK
-        run: |
-          # 1. ندخل على فولدر المشروع الأساسي
-          cd calora
-          
-          # 2. نمسح أي بقايا قديمة لضمان بداية نظيفة تماماً
-          echo "Deleting old node_modules and package-lock.json..."
-          rm -rf node_modules package-lock.json
-          
-          # 3. الخطوة السحرية: نستخدم "npx expo install" بدلاً من "npm install".
-          # هذا الأمر يقرأ package.json وينزل فقط الإصدارات المتوافقة 100%
-          echo "Installing compatible dependencies using 'expo install'..."
-          npx expo install
-          
-          # 4. نجهز ملفات الأندرويد بعد أن أصبحت كل المكتبات سليمة ومتوافقة
-          echo "Prebuilding Android project..."
-          npx expo prebuild --platform android --no-install
-          
-          # 5. ندخل على فولدر الأندرويد ونبني الـ APK
-          echo "Building Android APK..."
-          cd android
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+      # الخطوة 3: هننزل المكتبات جوه الفولدر الصح
+      - name: Install Dependencies
+        working-directory: ${{ env.WORK_DIR }}
+        run: npm install --legacy-peer-deps
 
+      # ===================================================================
+      #  الخطوة 4: الخطوة السحرية اللي كانت ناقصة لمشاريع Expo
+      # ===================================================================
+      - name: Prebuild and Sync Native Project
+        working-directory: ${{ env.WORK_DIR }}
+        run: npx expo prebuild --platform android --no-install
+
+      # الخطوة 5: هنبني الـ APK من الفولدر الصح
+      - name: Build Debug APK
+        working-directory: ${{ env.WORK_DIR }}/android
+        run: ./gradlew assembleDebug
+
+      # الخطوة 6: هنرفع الـ APK من المسار الكامل والصحيح
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: calora/android/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.WORK_DIR }}/android/app/build/outputs/apk/debug/*.apk
