@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 20.x
 
-      # 3. يجهز بيئة عمل Java (ضرورية لبناء الأندرويد)
+      # 3. يجهز بيئة عمل Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -31,31 +31,31 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 5. يحول المشروع لـ Bare (ينشئ فولدر android)
+      # 5. يحول المشروع لـ Bare
       - name: Prebuild for Android
         run: npx expo prebuild --platform android
 
-      # 6. يرجع ملف التوقيع السري من النص اللي حفظناه في Secrets
+      # 6. يرجع ملف التوقيع السري
       - name: Decode Keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > ./android/my-release-key.keystore
 
-      # 7. ((((  الخطوة الجديدة والمهمة لحل المشكلة  ))))
-      # يعطي ملف gradlew صلاحية التنفيذ
+      # 7. يعطي ملف gradlew صلاحية التنفيذ
       - name: Make gradlew executable
         working-directory: ./android
         run: chmod +x ./gradlew
 
-      # 8. يبدأ عملية البناء باستخدام Gradle ويوقع التطبيق
+      # 8. ((((  السطر ده هو اللي اتعدل  ))))
+      # يبدأ عملية البناء مع تحديد مسار node_modules بشكل صحيح
       - name: Build Android Release APK
         working-directory: ./android
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease -Pexpo.autolinking.nodeModulesPath=../node_modules
         env:
           MYAPP_UPLOAD_STORE_FILE: my-release-key.keystore
           MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      # 9. يرفع ملف الـ APK النهائي عشان تقدر تنزله
+      # 9. يرفع ملف الـ APK النهائي
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
