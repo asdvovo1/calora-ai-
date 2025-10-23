@@ -1,23 +1,33 @@
+# اسم الـ Workflow اللي بيظهر في صفحة Actions على GitHub
 name: Build Android APK
 
+# متى يتم تشغيل هذا الـ Workflow
 on:
+  # عند أي push على فرع main
   push:
     branches: [ "main" ]
+  # يسمح بتشغيله يدوياً من صفحة Actions
   workflow_dispatch:
 
+# قائمة الوظائف (Jobs) التي سيتم تنفيذها
 jobs:
   build:
+    # نوع السيرفر الذي سيتم تشغيل الوظيفة عليه
     runs-on: ubuntu-latest
     
+    # الخطوات (Steps) التي سيتم تنفيذها بالترتيب
     steps:
+      # الخطوة 1: تنزيل كود المشروع من الريبو على السيرفر
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # الخطوة 2: إعداد بيئة Node.js بالإصدار 20
       - name: Setup Node.js v20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      # الخطوة 3: إعداد بيئة Java JDK بالإصدار 17 (مطلوب لبناء الأندرويد)
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
@@ -25,34 +35,28 @@ jobs:
           java-version: '17'
 
       # ===================================================================
-      #  هنا الحل الكامل والنهائي بالترتيب الذهبي
+      #  الخطوة 4: تثبيت المكتبات وبناء المشروع (هذه هي الخطوة المُعدَّلة والنهائية)
       # ===================================================================
-      - name: Install Correct Dependencies, Prebuild, and Assemble APK
+      - name: Install Dependencies, Prebuild, and Build APK
+        # الـ working-directory بيخلي كل الأوامر تتنفذ جوه فولدر calora مباشرة
+        working-directory: ./calora
         run: |
-          # 1. ندخل على فولدر المشروع الأساسي
-          cd calora
+          # 1. الخطوة الحاسمة: ندمج التثبيت مع الـ Prebuild
+          # الأمر ده هيعمل install للمكتبات وبعدها مباشرة يبني ملفات الأندرويد
+          # ده بيضمن إن Gradle يلاقي كل حاجة بيحتاجها في مكانها الصحيح.
+          echo "Running prebuild which will also install dependencies..."
+          npx expo prebuild --platform android
           
-          # 2. نمسح أي بقايا قديمة لضمان بداية نظيفة تماماً
-          echo "Deleting old node_modules and package-lock.json..."
-          rm -rf node_modules package-lock.json
-          
-          # 3. الخطوة السحرية: نستخدم "npx expo install" بدلاً من "npm install".
-          # هذا الأمر يقرأ package.json وينزل فقط الإصدارات المتوافقة 100%
-          echo "Installing compatible dependencies using 'expo install'..."
-          npx expo install
-          
-          # 4. نجهز ملفات الأندرويد بعد أن أصبحت كل المكتبات سليمة ومتوافقة
-          echo "Prebuilding Android project..."
-          npx expo prebuild --platform android --no-install
-          
-          # 5. ندخل على فولدر الأندرويد ونبني الـ APK
+          # 2. ندخل على فولدر الأندرويد ونبني الـ APK
           echo "Building Android APK..."
           cd android
           chmod +x ./gradlew
           ./gradlew assembleDebug
 
+      # الخطوة 5: رفع ملف الـ APK الناتج كـ Artifact
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
+          # المسار الصحيح لملف الـ APK الناتج
           path: calora/android/app/build/outputs/apk/debug/*.apk
