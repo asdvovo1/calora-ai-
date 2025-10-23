@@ -17,11 +17,17 @@ jobs:
     
     # الخطوات (Steps) التي سيتم تنفيذها بالترتيب
     steps:
+<<<<<<< Updated upstream
       # الخطوة 1: تنزيل كود المشروع من الريبو على السيرفر
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       # الخطوة 2: إعداد بيئة Node.js بالإصدار 20
+=======
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+>>>>>>> Stashed changes
       - name: Setup Node.js v20
         uses: actions/setup-node@v4
         with:
@@ -34,6 +40,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+<<<<<<< Updated upstream
       # ===================================================================
       #  الخطوة 4: تثبيت المكتبات وبناء المشروع (هذه هي الخطوة المُعدَّلة والنهائية)
       # ===================================================================
@@ -54,9 +61,47 @@ jobs:
           ./gradlew assembleDebug
 
       # الخطوة 5: رفع ملف الـ APK الناتج كـ Artifact
+=======
+      # ===================================================================
+      #  الخطوة 4: تثبيت المكتبات (بشكل منفصل وصريح)
+      # ===================================================================
+      - name: Install Project Dependencies
+        working-directory: ./calora
+        run: |
+          echo "Installing dependencies using the recommended 'npx expo install' command..."
+          npx expo install
+
+      # ===================================================================
+      #  الخطوة 5: إنشاء ملفات الأندرويد (الآن بعد أن أصبحت المكتبات موجودة)
+      # ===================================================================
+      - name: Prebuild Android Project
+        working-directory: ./calora
+        run: |
+          echo "Dependencies installed. Starting prebuild process..."
+          # الآن يمكننا استخدام --no-install بأمان لأننا قمنا بالتثبيت في الخطوة السابقة
+          npx expo prebuild --platform android --no-install
+
+      # ===================================================================
+      #  الخطوة 6: بناء ملف الـ APK
+      # ===================================================================
+      - name: Build Android APK
+        working-directory: ./calora/android
+        run: |
+          echo "Prebuild complete. Building the Android APK..."
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
+
+      # ===================================================================
+      #  الخطوة 7: رفع الناتج
+      # ===================================================================
+>>>>>>> Stashed changes
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
+<<<<<<< Updated upstream
           # المسار الصحيح لملف الـ APK الناتج
           path: calora/android/app/build/outputs/apk/debug/*.apk
+=======
+          path: calora/android/app/build/outputs/apk/debug/*.apk
+>>>>>>> Stashed changes
