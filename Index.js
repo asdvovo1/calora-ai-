@@ -1,4 +1,4 @@
-// In IndexScreen.js (الكود الكامل والجديد)
+// In IndexScreen.js (الكود الكامل والنهائي والمعدل)
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -6,14 +6,13 @@ import {
   TouchableOpacity, StatusBar, SafeAreaView, Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native'; // استيراد useFocusEffect
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
 // ==========================================================
-// ===== الخطوة 1: تعريف الثيمات والترجمات =====
+// ===== الثيمات والترجمات (بدون تغيير) =====
 // ==========================================================
-
 const lightTheme = {
     background: '#F6FEF6',
     primary: '#4CAF50',
@@ -57,7 +56,6 @@ const translations = {
     }
 };
 
-// بيانات الشرائح الثابتة (الصور والمفاتيح)
 const slidesContent = [
     { id: '1', image: require('./assets/scan.png'), titleKey: 'cameraTitle', descriptionKey: 'cameraDesc' },
     { id: '2', image: require('./assets/calorie.png'), titleKey: 'accuracyTitle', descriptionKey: 'accuracyDesc' },
@@ -67,9 +65,6 @@ const slidesContent = [
 const getItemLayout = (data, index) => ({ length: width, offset: width * index, index });
 
 const IndexScreen = ({ navigation, route }) => {
-    // ==========================================================
-    // ===== الخطوة 2: إضافة حالات للثيم واللغة =====
-    // ==========================================================
     const [theme, setTheme] = useState(lightTheme);
     const [language, setLanguage] = useState('en');
     const [isRTL, setIsRTL] = useState(false);
@@ -78,12 +73,8 @@ const IndexScreen = ({ navigation, route }) => {
     const slidesRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
 
-    // دالة مساعدة للترجمة
     const t = (key) => translations[language]?.[key] || key;
 
-    // ==========================================================
-    // ===== الخطوة 3: تحميل الإعدادات عند فتح الشاشة =====
-    // ==========================================================
     useFocusEffect(
         useCallback(() => {
             const loadSettings = async () => {
@@ -92,7 +83,7 @@ const IndexScreen = ({ navigation, route }) => {
                     setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
 
                     const savedLang = await AsyncStorage.getItem('appLanguage');
-                    const currentLang = savedLang || 'en'; // الإنجليزية هي الافتراضية
+                    const currentLang = savedLang || 'en';
                     setLanguage(currentLang);
                     setIsRTL(currentLang === 'ar');
                 } catch (e) {
@@ -118,17 +109,15 @@ const IndexScreen = ({ navigation, route }) => {
         }
     }).current;
     const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
-
-    const handleNextPress = () => {
-        const nextSlideIndex = currentIndex + 1;
-        if (nextSlideIndex < slidesContent.length) {
-            if (slidesRef.current) {
-                slidesRef.current.scrollToIndex({ index: nextSlideIndex });
-            }
-        }
-    };
     
-    // دمج بيانات الشرائح مع الترجمات الحالية
+    // ✅✅✅  الإصلاح رقم 2: هنا تم حل مشكلة زر "التالي" ✅✅✅
+    const handleNextPress = useCallback(() => {
+        const nextSlideIndex = currentIndex + 1;
+        if (nextSlideIndex < slidesContent.length && slidesRef.current) {
+            slidesRef.current.scrollToIndex({ index: nextSlideIndex });
+        }
+    }, [currentIndex]); // أضفنا currentIndex هنا لتحديث الدالة دائمًا
+    
     const slides = slidesContent.map(slide => ({
         ...slide,
         title: t(slide.titleKey),
@@ -138,9 +127,6 @@ const IndexScreen = ({ navigation, route }) => {
     const currentSlide = slides[currentIndex] || slides[0];
 
     return (
-        // ==========================================================
-        // ===== الخطوة 4: تطبيق الثيم واللغة على الواجهة =====
-        // ==========================================================
         <SafeAreaView style={styles.container(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
             <View style={styles.topContainer(theme)}>
@@ -167,21 +153,23 @@ const IndexScreen = ({ navigation, route }) => {
                     )}
                 />
             </View>
+
             <View style={styles.bottomContainer(theme, isRTL)}>
-                <View style={styles.paginatorContainer(isRTL)}>
-                    {slides.map((_, i) => {
-                        const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
-                        const dotWidth = scrollX.interpolate({ inputRange, outputRange: [8, 25, 8], extrapolate: 'clamp' });
-                        const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
-                        return <Animated.View key={i.toString()} style={[styles.dot(theme), { width: dotWidth, opacity }]} />;
-                    })}
+                <View>
+                    <View style={styles.paginatorContainer(isRTL)}>
+                        {slides.map((_, i) => {
+                            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+                            const dotWidth = scrollX.interpolate({ inputRange, outputRange: [8, 25, 8], extrapolate: 'clamp' });
+                            const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+                            return <Animated.View key={i.toString()} style={[styles.dot(theme), { width: dotWidth, opacity }]} />;
+                        })}
+                    </View>
+
+                    <Text style={styles.title(theme, isRTL)}>{currentSlide.title}</Text>
+                    <Text style={styles.description(theme, isRTL)}>{currentSlide.description}</Text>
                 </View>
 
-                <Text style={styles.title(theme, isRTL)}>{currentSlide.title}</Text>
-                <Text style={styles.description(theme, isRTL)}>{currentSlide.description}</Text>
-
                 {currentIndex === slides.length - 1 ? (
-                    // ✅✅✅ المنطقة التي تم تعديلها ✅✅✅
                     <View style={styles.authButtonsContainer(isRTL)}>
                         <TouchableOpacity style={styles.authButton(styles.signInButton(theme))} onPress={async () => {
                             await AsyncStorage.setItem('hasSeenOnboarding', 'true');
@@ -207,7 +195,7 @@ const IndexScreen = ({ navigation, route }) => {
 };
 
 // ==========================================================
-// ===== الخطوة 5: تحويل الأنماط لتكون ديناميكية =====
+// ===== الأنماط =====
 // ==========================================================
 const styles = {
     container: (theme) => ({
@@ -215,7 +203,7 @@ const styles = {
         backgroundColor: theme.background,
     }),
     topContainer: (theme) => ({
-        height: height * 0.55,
+        height: height * 0.52,
         backgroundColor: theme.background,
         borderBottomLeftRadius: 80,
         borderBottomRightRadius: 80,
@@ -231,39 +219,39 @@ const styles = {
         height: '100%',
         alignItems: 'center',
         justifyContent: 'flex-end',
-        paddingBottom: 20,
+        paddingBottom: 40,
     },
     image: {
-        width: width * 0.8,
-        height: height * 0.5,
+        width: width * 0.75,
+        height: height * 0.4,
     },
     bottomContainer: (theme, isRTL) => ({
         flex: 1,
-        alignItems: isRTL ? 'flex-end' : 'flex-start',
         paddingHorizontal: 30,
         paddingTop: 30,
-        paddingBottom: 40,
+        paddingBottom: 15,
         backgroundColor: theme.background,
+        justifyContent: 'space-between', 
     }),
     title: (theme, isRTL) => ({
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: 'bold',
         color: theme.text,
         textAlign: isRTL ? 'right' : 'left',
-        marginBottom: 15,
+        marginBottom: 12,
     }),
     description: (theme, isRTL) => ({
-        fontSize: 14,
+        fontSize: 13,
         color: theme.text,
         textAlign: isRTL ? 'right' : 'left',
-        lineHeight: 22,
+        lineHeight: 20,
         opacity: 0.7,
-        marginBottom: 20,
     }),
+    // ✅✅✅  الإصلاح رقم 1: هنا تم حل مشكلة النقاط ✅✅✅
     paginatorContainer: (isRTL) => ({
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+        flexDirection: 'row', // نجعلها دائماً row
+        justifyContent: isRTL ? 'flex-end' : 'flex-start', // نحدد المحاذاة بناءً على اللغة
         marginBottom: 25,
-        width: '100%',
     }),
     dot: (theme) => ({
         height: 8,
@@ -278,7 +266,6 @@ const styles = {
         width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 'auto',
         elevation: 5,
         shadowColor: '#000',
         shadowOpacity: 0.1,
@@ -292,9 +279,9 @@ const styles = {
     authButtonsContainer: (isRTL) => ({
         flexDirection: isRTL ? 'row-reverse' : 'row',
         width: '100%',
-        marginTop: 'auto',
         justifyContent: 'space-between',
         gap: 15,
+        marginTop: 20,
     }),
     authButton: (specificStyles) => ({
         flex: 1,

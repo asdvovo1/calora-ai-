@@ -1,4 +1,4 @@
-// editprofile.js (الكود الكامل والنهائي بعد حل مشكلة الملفات)
+// editprofile.js
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, Platform, Keyboard } from 'react-native';
@@ -7,9 +7,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from '@react-navigation/native';
+// ✅ *** الخطوة 1: تأكد من استيراد useFocusEffect ***
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-// --- (لا توجد تغييرات هنا) ---
+// --- (لا توجد تغييرات في هذه الأجزاء) ---
 const translations = {
   en: { 
     editProfile: 'EDIT PROFILE', publicInfo: 'PUBLIC INFORMATION', firstName: 'First name', lastName: 'Last name', mail: 'Mail', physicalMetrics: 'PHYSICAL METRICS', gender: 'Gender', male: 'Male', female: 'Female', dob: 'Date of Birth', height: 'Height (cm)', currentWeight: 'Current Weight (kg)', goals: 'GOALS', mainGoal: 'Main Goal', lose: 'Lose', maintain: 'Maintain', gain: 'Gain', targetWeight: 'Target Weight (kg)', activityLevel: 'Activity Level', sedentary: 'Sedentary', light: 'Light', active: 'Active', very_active: 'Very Active', profilePic: 'Profile Picture', chooseNewPic: 'Choose your new picture', takePhoto: 'Take Photo', chooseFromGallery: 'Choose from Gallery', cancel: 'Cancel', success: 'Success', saveSuccess: 'Changes saved successfully!', error: 'Error', saveError: 'An error occurred while saving data.', 
@@ -21,8 +22,9 @@ const translations = {
 const lightTheme = { background: '#F7FDF9', surface: '#FFFFFF', textDark: '#1D1D1D', textGray: '#888888', primary: '#388E3C', border: '#EFEFEF', disabledBackground: '#F7F7F7', icon: '#1D1D1D' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', textDark: '#FFFFFF', textGray: '#A5A5A5', primary: '#66BB6A', border: '#38383A', disabledBackground: '#3A3A3C', icon: '#FFFFFF' };
 const calculateCalories = (userData) => { if (!userData || !userData.birthDate || !userData.weight || !userData.height || !userData.gender || !userData.activityLevel || !userData.goal) return 2000; const { birthDate, gender, weight, height, activityLevel, goal } = userData; const age = new Date().getFullYear() - new Date(birthDate).getFullYear(); let bmr = (gender === 'male') ? (10 * weight + 6.25 * height - 5 * age + 5) : (10 * weight + 6.25 * height - 5 * age - 161); const activityMultipliers = { sedentary: 1.2, light: 1.375, active: 1.55, very_active: 1.725 }; const tdee = bmr * (activityMultipliers[activityLevel] || 1.2); let finalCalories; switch (goal) { case 'lose': finalCalories = tdee - 500; break; case 'gain': finalCalories = tdee + 500; break; default: finalCalories = tdee; break; } return Math.max(1200, Math.round(finalCalories)); };
-const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme, isRTL }) => { const styles = getStyles(theme, isRTL); return ( <View style={styles.inputContainer}> <View style={{flex: 1}}> <Text style={styles.inputLabel}>{label}</Text> <TextInput style={styles.textInput} value={value} onChangeText={onChangeText} keyboardType={keyboardType} placeholderTextColor={theme.textGray} /> </View> {value && value.trim().length > 0 && <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />} </View> ); });
-const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme, isRTL }) => { const styles = getStyles(theme, isRTL); return ( <View style={styles.optionContainer}> <Text style={styles.inputLabel}>{label}</Text> <View style={styles.optionsWrapper}> {options.map((option) => ( <TouchableOpacity key={option.value} style={[styles.optionButton, selectedValue === option.value && styles.optionButtonSelected]} onPress={() => onSelect(option.value)}> <Text style={[styles.optionText, selectedValue === option.value && styles.optionTextSelected]} numberOfLines={1} adjustsFontSizeToFit>{option.label}</Text> </TouchableOpacity> ))} </View> </View> ); });
+const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme, isRTL }) => { const styles = getStyles(theme, isRTL); return ( <View style={styles.inputContainer}><View style={{flex: 1}}><Text style={styles.inputLabel}>{label}</Text><TextInput style={styles.textInput} value={value} onChangeText={onChangeText} keyboardType={keyboardType} placeholderTextColor={theme.textGray} /></View>{value && value.trim().length > 0 && <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />}</View> ); });
+const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme, isRTL }) => { const styles = getStyles(theme, isRTL); return ( <View style={styles.optionContainer}><Text style={styles.inputLabel}>{label}</Text><View style={styles.optionsWrapper}>{options.map((option) => ( <TouchableOpacity key={option.value} style={[styles.optionButton, selectedValue === option.value && styles.optionButtonSelected]} onPress={() => onSelect(option.value)}><Text style={[styles.optionText, selectedValue === option.value && styles.optionTextSelected]} numberOfLines={1} adjustsFontSizeToFit>{option.label}</Text></TouchableOpacity> ))}</View></View> ); });
+// --- (نهاية الأجزاء التي لم تتغير) ---
 
 
 const EditProfileScreen = () => {
@@ -48,8 +50,59 @@ const EditProfileScreen = () => {
   const isRTL = activeLanguage === 'ar';
   const t = (key) => translations[activeLanguage][key] || translations['en'][key];
 
-  // --- Logic and Hooks ---
-  useEffect(() => { const loadSettingsAndData = async () => { try { const savedLang = await AsyncStorage.getItem('appLanguage'); const savedTheme = await AsyncStorage.getItem('isDarkMode'); if (savedLang) setActiveLanguage(savedLang); setIsDarkMode(savedTheme === 'true'); const jsonValue = await AsyncStorage.getItem('userProfile'); if (jsonValue != null) { const data = JSON.parse(jsonValue); setFirstName(data.firstName || ''); setLastName(data.lastName || ''); setEmail(data.email || ''); setProfileImage(data.profileImage || null); setGender(data.gender || null); setBirthDate(data.birthDate ? new Date(data.birthDate) : new Date()); setHeight(data.height ? String(data.height) : ''); setWeight(data.weight ? String(data.weight) : ''); setGoal(data.goal || null); setTargetWeight(data.targetWeight ? String(data.targetWeight) : ''); setActivityLevel(data.activityLevel || null); } } catch(e) { console.error("Failed to load settings or data", e); } finally { setIsLoading(false); } }; loadSettingsAndData(); const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => { setKeyboardPadding(e.endCoordinates.height); }); const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => { setKeyboardPadding(50); }); return () => { keyboardDidHideListener.remove(); keyboardDidShowListener.remove(); }; }, []);
+  // ✅ *** الخطوة 2: استبدال useEffect بـ useFocusEffect لتحميل البيانات ***
+  // هذا الكود سيُنفذ في كل مرة تدخل فيها إلى هذه الشاشة
+  useFocusEffect(
+    useCallback(() => {
+      const loadSettingsAndData = async () => {
+        setIsLoading(true); // إظهار التحميل عند كل مرة
+        try {
+          const savedLang = await AsyncStorage.getItem('appLanguage');
+          const savedTheme = await AsyncStorage.getItem('isDarkMode');
+          if (savedLang) setActiveLanguage(savedLang);
+          setIsDarkMode(savedTheme === 'true');
+
+          const jsonValue = await AsyncStorage.getItem('userProfile');
+          if (jsonValue != null) {
+            const data = JSON.parse(jsonValue);
+            setFirstName(data.firstName || '');
+            setLastName(data.lastName || '');
+            setEmail(data.email || ''); // سيتم تحميل الإيميل الجديد من هنا
+            setProfileImage(data.profileImage || null);
+            setGender(data.gender || null);
+            setBirthDate(data.birthDate ? new Date(data.birthDate) : new Date());
+            setHeight(data.height ? String(data.height) : '');
+            setWeight(data.weight ? String(data.weight) : '');
+            setGoal(data.goal || null);
+            setTargetWeight(data.targetWeight ? String(data.targetWeight) : '');
+            setActivityLevel(data.activityLevel || null);
+          }
+        } catch(e) {
+          console.error("Failed to load settings or data", e);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      loadSettingsAndData();
+    }, []) // اترك هذا الفراغ كما هو
+  );
+
+  // هذا الـ useEffect مخصص فقط لمراقبة ظهور وإخفاء الكيبورد
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardPadding(e.endCoordinates.height);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardPadding(50);
+    });
+
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
+
   const handleImagePicker = useCallback(() => { Alert.alert(t('profilePic'), t('chooseNewPic'), [ { text: t('takePhoto'), onPress: () => launchCamera({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('chooseFromGallery'), onPress: () => launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('cancel'), style: 'cancel' } ]); }, [t]);
   const onDateChange = useCallback((event, selectedDate) => { setShowDatePicker(Platform.OS === 'ios'); if (selectedDate) { setBirthDate(selectedDate); } }, []);
   const handleSave = useCallback(async () => { const updatedUserData = { firstName, lastName, email, profileImage, gender, birthDate: birthDate.toISOString(), height: parseFloat(height), weight: parseFloat(weight), goal, targetWeight: goal === 'maintain' ? null : parseFloat(targetWeight), activityLevel }; const newDailyGoal = calculateCalories(updatedUserData); const finalProfileData = { ...updatedUserData, dailyGoal: newDailyGoal }; try { await AsyncStorage.setItem('userProfile', JSON.stringify(finalProfileData)); navigation.goBack(); } catch (error) { Alert.alert(t('error'), t('saveError')); } }, [firstName, lastName, email, profileImage, gender, birthDate, height, weight, goal, targetWeight, activityLevel, navigation, t]);

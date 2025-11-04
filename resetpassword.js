@@ -1,9 +1,13 @@
-// File: resetpassword.js (الكود الكامل والنهائي)
+// File: resetpassword.js (تمت إعادة هيكلته ليعمل بشكل صحيح مع لوحة المفاتيح)
 
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
   TouchableOpacity, StatusBar, Dimensions, Image, Alert, ActivityIndicator,
+  // === تمت إضافة المكونات الضرورية ===
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -13,19 +17,15 @@ import { supabase } from './supabaseclient'; // تأكد من المسار ال�
 
 const { width, height } = Dimensions.get('window');
 
-// ==========================================================
-// ===== الثيمات والترجمات =====
-// ==========================================================
+// --- الثيمات والترجمات (بدون تغيير) ---
 const lightTheme = {
     primary: '#4CAF50', secondary: '#2ECC71', background: '#FFFFFF', textPrimary: '#212529',
     textSecondary: '#6C757D', borderColor: '#E9ECEF', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#F7F8F9',
 };
-
 const darkTheme = {
     primary: '#66BB6A', secondary: '#81C784', background: '#121212', textPrimary: '#FFFFFF',
     textSecondary: '#B0B0B0', borderColor: '#2C2C2C', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#1E1E1E',
 };
-
 const translations = {
     ar: {
         headerTitle: 'إنشاء كلمة مرور جديدة', title: 'إعادة تعيين كلمة المرور',
@@ -49,21 +49,28 @@ const translations = {
     }
 };
 
-const HeaderCurve = ({ theme }) => (
-  <View style={styles.headerCurveContainer}>
-    <Svg height={height * 0.18} width={width} viewBox={`0 0 ${width} ${height * 0.18}`}>
-      <Defs>
-        <LinearGradient id="grad-reset" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={theme.primary} />
-          <Stop offset="1" stopColor={theme.secondary} />
-        </LinearGradient>
-      </Defs>
-      <Path
-        d={`M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`}
-        fill="url(#grad-reset)"
-      />
-    </Svg>
-  </View>
+// مكون الهيدر المدمج ليتم وضعه داخل ScrollView
+const HeaderComponent = ({ theme, isRTL, navigation, title }) => (
+    <View style={styles.headerContainer}>
+        <Svg height={height * 0.18} width={width} style={{ position: 'absolute', top: 0 }}>
+            <Defs>
+                <LinearGradient id="grad-reset" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor={theme.primary} />
+                    <Stop offset="1" stopColor={theme.secondary} />
+                </LinearGradient>
+            </Defs>
+            <Path
+                d={`M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`}
+                fill="url(#grad-reset)"
+            />
+        </Svg>
+        <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
+                <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle(theme)}>{title}</Text>
+        </View>
+    </View>
 );
 
 const ResetPasswordScreen = ({ navigation }) => {
@@ -108,10 +115,7 @@ const ResetPasswordScreen = ({ navigation }) => {
                 Alert.alert(t('successTitle'), t('passwordSuccess'), [
                     { 
                         text: 'OK', 
-                        onPress: () => navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'MainUI' }],
-                        }),
+                        onPress: () => navigation.reset({ index: 0, routes: [{ name: 'MainUI' }] }),
                     },
                 ]);
             }
@@ -123,65 +127,87 @@ const ResetPasswordScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container(theme)}>
+        <SafeAreaView style={styles.safeArea(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.primary} />
-            <HeaderCurve theme={theme} />
-            <View style={styles.headerContent}>
-                <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-                    <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle(theme)}>{t('headerTitle')}</Text>
-            </View>
-            <View style={styles.formContainer}>
-                <Text style={styles.title(theme)}>{t('title')}</Text>
-                <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
-                
-                <View style={styles.inputContainer(theme, isRTL)}>
-                    <Icon name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
-                    <TextInput 
-                        placeholder={t('newPasswordPlaceholder')} 
-                        placeholderTextColor={theme.textSecondary} 
-                        style={styles.input(theme, isRTL)} 
-                        secureTextEntry={isPasswordSecure} 
-                        value={password} 
-                        onChangeText={setPassword} 
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{flex: 1}}
+            >
+                <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+                    <HeaderComponent 
+                        theme={theme} 
+                        isRTL={isRTL} 
+                        navigation={navigation} 
+                        title={t('headerTitle')}
                     />
-                    <TouchableOpacity onPress={() => setIsPasswordSecure(!isPasswordSecure)}>
-                        <Icon name={isPasswordSecure ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                </View>
-                
-                <View style={styles.inputContainer(theme, isRTL)}>
-                    <Icon name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
-                    <TextInput 
-                        placeholder={t('confirmPasswordPlaceholder')} 
-                        placeholderTextColor={theme.textSecondary} 
-                        style={styles.input(theme, isRTL)} 
-                        secureTextEntry={isConfirmSecure} 
-                        value={confirmPassword} 
-                        onChangeText={setConfirmPassword} 
-                    />
-                    <TouchableOpacity onPress={() => setIsConfirmSecure(!isConfirmSecure)}>
-                        <Icon name={isConfirmSecure ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                </View>
-                
-                <TouchableOpacity style={styles.resetButton(theme)} onPress={handleResetPassword} disabled={loading}>
-                    {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.resetButtonText(theme)}>{t('resetButton')}</Text>}
-                </TouchableOpacity>
-            </View>
-            <Image source={require('./assets/leavesdecoration.png')} style={styles.footerImage} />
+
+                    <View style={styles.formContainer}>
+                        <Text style={styles.title(theme)}>{t('title')}</Text>
+                        <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
+                        
+                        <View style={styles.inputContainer(theme, isRTL)}>
+                            <Icon name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
+                            <TextInput 
+                                placeholder={t('newPasswordPlaceholder')} 
+                                placeholderTextColor={theme.textSecondary} 
+                                style={styles.input(theme, isRTL)} 
+                                secureTextEntry={isPasswordSecure} 
+                                value={password} 
+                                onChangeText={setPassword} 
+                            />
+                            <TouchableOpacity onPress={() => setIsPasswordSecure(!isPasswordSecure)}>
+                                <Icon name={isPasswordSecure ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View style={styles.inputContainer(theme, isRTL)}>
+                            <Icon name="lock" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
+                            <TextInput 
+                                placeholder={t('confirmPasswordPlaceholder')} 
+                                placeholderTextColor={theme.textSecondary} 
+                                style={styles.input(theme, isRTL)} 
+                                secureTextEntry={isConfirmSecure} 
+                                value={confirmPassword} 
+                                onChangeText={setConfirmPassword} 
+                            />
+                            <TouchableOpacity onPress={() => setIsConfirmSecure(!isConfirmSecure)}>
+                                <Icon name={isConfirmSecure ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <TouchableOpacity style={styles.resetButton(theme)} onPress={handleResetPassword} disabled={loading}>
+                            {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.resetButtonText(theme)}>{t('resetButton')}</Text>}
+                        </TouchableOpacity>
+                    </View>
+
+                    <View>
+                        <Image source={require('./assets/leavesdecoration.png')} style={styles.footerImage} />
+                    </View>
+                    
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
 
+// ==========================================================
+// ===== ✅ الأنماط النهائية التي تطابق سلوك شاشة تسجيل الدخول ✅ =====
+// ==========================================================
 const styles = {
-    container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    headerCurveContainer: { position: 'absolute', top: 0, left: 0, right: 0 },
-    headerContent: { marginTop: StatusBar.currentHeight || 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+    safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
+
+    headerContainer: { height: height * 0.22 },
+    headerContent: { marginTop: (StatusBar.currentHeight || 40) + 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
     backButton: (isRTL) => ({ padding: 10, position: 'absolute', [isRTL ? 'right' : 'left']: 15, zIndex: 1 }),
     headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.headerText, textAlign: 'center', flex: 1 }),
-    formContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 100 },
+    
+    formContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        paddingHorizontal: 30, 
+        paddingBottom: 20 
+    },
     title: (theme) => ({ fontSize: 26, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'center', marginBottom: 15 }),
     subtitle: (theme) => ({ fontSize: 15, color: theme.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 22 }),
     inputContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', backgroundColor: theme.inputBackground, borderRadius: 12, paddingHorizontal: 15, marginBottom: 20, borderWidth: 1, borderColor: theme.borderColor, height: 58 }),
@@ -189,7 +215,8 @@ const styles = {
     input: (theme, isRTL) => ({ flex: 1, fontSize: 16, color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left' }),
     resetButton: (theme) => ({ backgroundColor: theme.primary, paddingVertical: 18, borderRadius: 12, alignItems: 'center', marginTop: 20, shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 }),
     resetButtonText: (theme) => ({ color: theme.headerText, fontSize: 18, fontWeight: 'bold' }),
-    footerImage: { position: 'absolute', bottom: 0, width: width, height: 80, resizeMode: 'cover' },
+    
+    footerImage: { width: width, height: 80, resizeMode: 'cover' },
 };
 
 export default ResetPasswordScreen;

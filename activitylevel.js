@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,21 +13,32 @@ import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 
-// ===================================================================
-// --- 1. الثيمات والترجمات ---
-// ===================================================================
+// --- الثيمات (مظهر فاتح وداكن) ---
 const lightTheme = {
-  primary: '#388E3C', textAndIcons: '#2E7D32', background: '#F9FBFA', white: '#FFFFFF',
-  cardBorder: '#EFF2F1', grayText: '#888888', disabled: '#A5D6A7', progressBarBg: '#E8F5E9',
+  primary: '#388E3C',
+  textAndIcons: '#2E7D32',
+  background: '#F9FBFA',
+  white: '#FFFFFF',
+  cardBorder: '#EFF2F1',
+  grayText: '#888888',
+  disabled: '#A5D6A7',
+  progressBarBg: '#E8F5E9',
   statusBar: 'dark-content',
 };
 
 const darkTheme = {
-  primary: '#66BB6A', textAndIcons: '#AED581', background: '#121212', white: '#1E1E1E',
-  cardBorder: '#272727', grayText: '#B0B0B0', disabled: '#424242', progressBarBg: '#333333',
+  primary: '#66BB6A',
+  textAndIcons: '#AED581',
+  background: '#121212',
+  white: '#1E1E1E',
+  cardBorder: '#272727',
+  grayText: '#B0B0B0',
+  disabled: '#424242',
+  progressBarBg: '#333333',
   statusBar: 'light-content',
 };
 
+// --- ملف الترجمة ---
 const translations = {
   en: {
     title: 'How Active Are You?',
@@ -47,7 +58,7 @@ const translations = {
     subtitle: 'هذا يساعدنا على حساب عدد السعرات التي يحرقها جسمك يومياً.',
     sedentaryTitle: 'خامل',
     sedentaryDescription: 'عمل مكتبي، معظم اليوم جلوس، بدون تمارين.',
-    lightTitle: 'خفيف', // تم التعديل هنا للاتساق
+    lightTitle: 'خفيف النشاط',
     lightDescription: 'حركة خفيفة أو تمارين 1-2 مرة أسبوعياً.',
     activeTitle: 'نشيط',
     activeDescription: 'تمارين متوسطة الشدة 3-5 مرات أسبوعياً.',
@@ -57,9 +68,8 @@ const translations = {
   },
 };
 
-// ===================================================================
-// --- 2. المكونات الاحترافية الديناميكية ---
-// ===================================================================
+// --- المكونات المساعدة ---
+
 const ProgressBar = ({ step, totalSteps, theme }) => (
   <View style={styles.progressBarContainer(theme)}>
     <View style={[styles.progressBar(theme), { width: `${(step / totalSteps) * 100}%` }]} />
@@ -68,8 +78,17 @@ const ProgressBar = ({ step, totalSteps, theme }) => (
 
 const PrimaryButton = ({ title, onPress, disabled = false, theme }) => (
   <Pressable
-    style={({ pressed }) => [styles.button(theme), disabled ? styles.buttonDisabled(theme) : styles.buttonEnabled(theme), pressed && !disabled && styles.buttonPressed]}
-    onPress={() => { if (!disabled) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onPress(); } }}
+    style={({ pressed }) => [
+      styles.button(theme),
+      disabled ? styles.buttonDisabled(theme) : styles.buttonEnabled(theme),
+      pressed && !disabled && styles.buttonPressed,
+    ]}
+    onPress={() => {
+      if (!disabled) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }
+    }}
     disabled={disabled}>
     <Text style={styles.buttonText(theme)}>{title}</Text>
   </Pressable>
@@ -90,28 +109,34 @@ const ActivityCard = ({ title, description, icon, isSelected, onPress, theme, is
       {icon.type === 'image' ? (
         <Image source={icon.source} style={[styles.activityCardImage, icon.style, { tintColor: iconColor }]} />
       ) : (
-        <Icon name={icon.name} size={40} color={iconColor} />
+        <Icon name={icon.name} size={28} color={iconColor} />
       )}
     </View>
   );
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.activityCard(theme, isRTL), isSelected && styles.activityCardSelected(theme), pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.activityCard(theme, isRTL),
+        isSelected && styles.activityCardSelected(theme),
+        pressed && styles.cardPressed,
+      ]}
       onPress={onPress}>
       {renderIcon()}
       <View style={styles.activityTextContainer(isRTL)}>
-        <Text style={[styles.activityCardTitle(theme, isRTL), isSelected && styles.activityCardTextSelected(theme)]}>{title}</Text>
-        <Text style={[styles.activityCardDescription(theme, isRTL), isSelected && styles.activityCardTextSelected(theme)]}>{description}</Text>
+        <Text style={[styles.activityCardTitle(theme, isRTL), isSelected && styles.activityCardTextSelected(theme)]}>
+          {title}
+        </Text>
+        <Text style={[styles.activityCardDescription(theme, isRTL), isSelected && styles.activityCardTextSelected(theme)]}>
+          {description}
+        </Text>
       </View>
     </Pressable>
   );
 };
 
+// --- شاشة مستوى النشاط (المكون الرئيسي) ---
 
-// ===================================================================
-// --- 3. شاشة مستوى النشاط (ActivityLevelScreen) ---
-// ===================================================================
 const ActivityLevelScreen = ({ navigation, route }) => {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [theme, setTheme] = useState(lightTheme);
@@ -119,21 +144,26 @@ const ActivityLevelScreen = ({ navigation, route }) => {
 
   const isRTL = language === 'ar';
   const t = (key) => translations[language]?.[key] || translations['en'][key];
-  
+
   const ACTIVITY_LEVELS = [
-    { key: 'sedentary', title: t('sedentaryTitle'), description: t('sedentaryDescription'), icon: { type: 'image', source: require('./assets/idleman.png'), style: { width: 45, height: 45 } } },
+    { key: 'sedentary', title: t('sedentaryTitle'), description: t('sedentaryDescription'), icon: { type: 'image', source: require('./assets/idleman.png'), style: { width: 34, height: 34 } } },
     { key: 'light', title: t('lightTitle'), description: t('lightDescription'), icon: { type: 'icon', name: 'walk' } },
     { key: 'active', title: t('activeTitle'), description: t('activeDescription'), icon: { type: 'icon', name: 'run' } },
-    { key: 'very_active', title: t('veryActiveTitle'), description: t('veryActiveDescription'), icon: { type: 'image', source: require('./assets/veryactiveman.png'), style: { width: 55, height: 55 } } },
+    { key: 'very_active', title: t('veryActiveTitle'), description: t('veryActiveDescription'), icon: { type: 'image', source: require('./assets/veryactiveman.png'), style: { width: 42, height: 42 } } },
   ];
 
+  // تحميل إعدادات اللغة والثيم عند الدخول للشاشة
   useFocusEffect(
     React.useCallback(() => {
       const loadSettings = async () => {
-        const darkMode = await AsyncStorage.getItem('isDarkMode');
-        setTheme(darkMode === 'true' ? darkTheme : lightTheme);
-        const lang = await AsyncStorage.getItem('appLanguage');
-        setLanguage(lang || 'ar');
+        try {
+            const darkMode = await AsyncStorage.getItem('isDarkMode');
+            setTheme(darkMode === 'true' ? darkTheme : lightTheme);
+            const lang = await AsyncStorage.getItem('appLanguage');
+            setLanguage(lang || 'ar');
+        } catch (e) {
+            console.error("Failed to load settings.", e);
+        }
       };
       loadSettings();
     }, [])
@@ -146,9 +176,11 @@ const ActivityLevelScreen = ({ navigation, route }) => {
 
   const handleCalculatePlan = () => {
     const finalUserData = {
-      ...(route.params?.userData || {}),
+      // <<< ✅✅✅ التصحيح هنا: نقرأ البيانات من route.params مباشرة
+      ...(route.params || {}), 
       activityLevel: selectedActivity,
     };
+    // الانتقال إلى شاشة النتائج مع إرسال كل بيانات المستخدم
     navigation.navigate('Results', { userData: finalUserData });
   };
 
@@ -175,7 +207,7 @@ const ActivityLevelScreen = ({ navigation, route }) => {
             />
           ))}
         </View>
-        
+
         <View style={styles.footer}>
           <PrimaryButton
             title={t('buttonTitle')}
@@ -189,69 +221,138 @@ const ActivityLevelScreen = ({ navigation, route }) => {
   );
 };
 
-// ===================================================================
-// --- 4. الأنماط الديناميكية ---
-// ===================================================================
-const styles = {
-  safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-  container: { 
-    flex: 1, 
-    padding: 24
-  },
-  progressBarContainer: (theme) => ({ 
-      height: 8, 
-      width: '100%', 
-      backgroundColor: theme.progressBarBg, 
-      borderRadius: 4,
-      marginBottom: 20
+// --- الأنماط (Styles) ---
+
+const styles = StyleSheet.create({
+  safeArea: (theme) => ({
+    flex: 1,
+    backgroundColor: theme.background,
   }),
-  progressBar: (theme) => ({ height: '100%', backgroundColor: theme.primary, borderRadius: 4 }),
-  headerContainer: { 
-      alignItems: 'center', 
-      marginVertical: 20
+  container: {
+    flex: 1,
+    padding: 24,
   },
-  title: (theme) => ({ fontSize: 26, fontWeight: 'bold', color: theme.textAndIcons, marginBottom: 10, textAlign: 'center' }),
-  subtitle: (theme) => ({ fontSize: 15, color: theme.grayText, textAlign: 'center', lineHeight: 22 }),
-  cardsContainer: { 
-      flex: 1,
-      justifyContent: 'center', 
+  progressBarContainer: (theme) => ({
+    height: 8,
+    width: '100%',
+    backgroundColor: theme.progressBarBg,
+    borderRadius: 4,
+    marginBottom: 20,
+  }),
+  progressBar: (theme) => ({
+    height: '100%',
+    backgroundColor: theme.primary,
+    borderRadius: 4,
+  }),
+  headerContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
   },
-  footer: { 
-    paddingTop: 10,
+  title: (theme) => ({
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: theme.textAndIcons,
+    marginBottom: 10,
+    textAlign: 'center',
+  }),
+  subtitle: (theme) => ({
+    fontSize: 15,
+    color: theme.grayText,
+    textAlign: 'center',
+    lineHeight: 22,
+  }),
+  cardsContainer: {
+    flex: 1,
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+  },
+  footer: {
     paddingBottom: 20,
+    paddingTop: 10,
   },
-  button: (theme) => ({ paddingVertical: 18, borderRadius: 16, alignItems: 'center', justifyContent: 'center', width: '100%' }),
-  buttonEnabled: (theme) => ({ backgroundColor: theme.primary, shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 }),
-  buttonDisabled: (theme) => ({ backgroundColor: theme.disabled, elevation: 0, shadowColor: 'transparent' }),
-  buttonPressed: { transform: [{ scale: 0.98 }], shadowOpacity: 0.15 },
-  buttonText: (theme) => ({ color: theme.background === '#121212' ? '#121212' : '#FFF', fontSize: 18, fontWeight: 'bold' }),
-  activityCard: (theme, isRTL) => ({
-    backgroundColor: theme.white, 
-    paddingHorizontal: 20, 
+  button: (theme) => ({
     paddingVertical: 18,
     borderRadius: 16,
-    marginBottom: 15, 
-    borderWidth: 2, 
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  }),
+  buttonEnabled: (theme) => ({
+    backgroundColor: theme.primary,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  }),
+  buttonDisabled: (theme) => ({
+    backgroundColor: theme.disabled,
+    elevation: 0,
+    shadowColor: 'transparent',
+  }),
+  buttonPressed: {
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.15,
+  },
+  buttonText: (theme) => ({
+    color: theme.background === '#121212' ? '#121212' : '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  }),
+  activityCard: (theme, isRTL) => ({
+    backgroundColor: theme.white,
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 16,
+    borderWidth: 2,
     borderColor: theme.cardBorder,
     flexDirection: isRTL ? 'row-reverse' : 'row',
     alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
   }),
-  activityCardSelected: (theme) => ({ backgroundColor: theme.primary, borderColor: theme.primary, elevation: 6, shadowColor: theme.primary, shadowOpacity: 0.2 }),
-  cardPressed: { transform: [{ scale: 0.99 }] },
+  activityCardSelected: (theme) => ({
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+    elevation: 6,
+    shadowColor: theme.primary,
+    shadowOpacity: 0.2,
+  }),
+  cardPressed: {
+    transform: [{ scale: 0.99 }],
+  },
   iconContainer: {
-    width: 60, 
-    height: 60,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
   activityCardImage: {
-    resizeMode: 'contain', 
+    resizeMode: 'contain',
   },
-  activityTextContainer: (isRTL) => ({ flex: 1, [isRTL ? 'marginRight' : 'marginLeft']: 15 }),
-  activityCardTitle: (theme, isRTL) => ({ fontSize: 17, fontWeight: 'bold', color: theme.textAndIcons, textAlign: isRTL ? 'right' : 'left' }),
-  activityCardDescription: (theme, isRTL) => ({ fontSize: 13, color: theme.grayText, textAlign: isRTL ? 'right' : 'left', marginTop: 4, lineHeight: 18 }),
-  activityCardTextSelected: (theme) => ({ color: theme.background === '#121212' ? '#121212' : '#FFF' }),
-};
+  activityTextContainer: (isRTL) => ({
+    flex: 1,
+    ...(isRTL ? { marginRight: 15 } : { marginLeft: 15 }),
+  }),
+  activityCardTitle: (theme, isRTL) => ({
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: theme.textAndIcons,
+    textAlign: isRTL ? 'right' : 'left',
+  }),
+  activityCardDescription: (theme, isRTL) => ({
+    fontSize: 13,
+    color: theme.grayText,
+    textAlign: isRTL ? 'right' : 'left',
+    marginTop: 4,
+    lineHeight: 18,
+  }),
+  activityCardTextSelected: (theme) => ({
+    color: theme.background === '#121212' ? '#121212' : '#FFF',
+  }),
+});
 
 export default ActivityLevelScreen;

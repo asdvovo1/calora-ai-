@@ -1,14 +1,12 @@
-// profile.js (الكود الكامل بعد التعديل)
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, RefreshControl, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-// ✅ --- التعديل (1): استيراد useFocusEffect بدلاً من useIsFocused --- ✅
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabaseclient'; 
 
-// --- الترجمات والثيمات (تبقى كما هي داخل الملف) ---
+// --- الترجمات والثيمات (تبقى كما هي) ---
 const translations = {
   en: { newUser: 'New User', editProfile: 'Edit Profile', settings: 'Settings', about: 'About', logout: 'Logout', logoutErrorTitle: 'Error', logoutErrorMessage: 'An error occurred while logging out.' },
   ar: { newUser: 'مستخدم جديد', editProfile: 'تعديل الملف الشخصي', settings: 'الإعدادات', about: 'حول التطبيق', logout: 'تسجيل الخروج', logoutErrorTitle: 'خطأ', logoutErrorMessage: 'حدث خطأ أثناء تسجيل الخروج.' },
@@ -16,11 +14,12 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', primaryText: '#1C1C1E', secondaryText: '#8A8A8E', separator: '#E5E5EA', logout: '#FF3B30', statusBar: 'dark-content', borderColor: '#FFFFFF' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', primaryText: '#FFFFFF', secondaryText: '#A5A5A5', separator: '#38383A', logout: '#EF5350', statusBar: 'light-content', borderColor: '#1E1E1E' };
 
+// ✅✅✅ [الإصلاح الرئيسي هنا]: تم تعديل المكون والـ Style بتاعه ✅✅✅
 const SettingsItem = ({ icon, name, onPress, color, theme, isRTL }) => (
     <TouchableOpacity style={styles.settingsItem(theme)} onPress={onPress}>
-      <View style={[styles.settingsItemContent, { flexDirection: 'row' }]}>
-        {icon}
-        <Text style={[styles.settingsItemText(theme), { color: color || theme.primaryText, flex: 1, textAlign: isRTL ? 'right' : 'left', marginHorizontal: 15 }]}>{name}</Text>
+      <View style={[styles.settingsItemContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={styles.settingsItemIcon(isRTL)}>{icon}</View>
+        <Text style={[styles.settingsItemText(theme), { color: color || theme.primaryText }]}>{name}</Text>
       </View>
       <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
     </TouchableOpacity>
@@ -31,14 +30,12 @@ const ProfileScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [language, setLanguage] = useState('en'); // القيمة الأولية سيتم تحديثها فوراً
+  const [language, setLanguage] = useState('en');
 
-  // يتم تحديد الثيم والاتجاه بناءً على الحالة الحالية
   const theme = isDarkMode ? darkTheme : lightTheme;
   const isRTL = language === 'ar';
   const t = (key) => translations[language]?.[key] || translations['en'][key];
 
-  // دالة موحدة لتحميل كل بيانات الشاشة (بيانات المستخدم، الثيم، اللغة)
   const loadScreenData = useCallback(async () => {
     try {
       const userJson = await AsyncStorage.getItem('userProfile');
@@ -56,15 +53,11 @@ const ProfileScreen = () => {
     }
   }, []);
 
-  // ✅ --- التعديل (2): استخدام useFocusEffect لتشغيل الكود عند التركيز على الشاشة --- ✅
   useFocusEffect(
     useCallback(() => {
-      // سيتم استدعاء هذه الدالة في كل مرة يتم فيها فتح شاشة الملف الشخصي
       loadScreenData();
-
-      // يمكن إرجاع دالة للتنظيف إذا لزم الأمر، ولكنها غير ضرورية هنا
       return () => {};
-    }, [loadScreenData]) // الاعتمادية هنا هي الدالة نفسها
+    }, [loadScreenData])
   );
 
   const onRefresh = useCallback(async () => {
@@ -75,9 +68,20 @@ const ProfileScreen = () => {
   
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem('userProfile');
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        Alert.alert('Logout Error', error.message);
+        return; 
+      }
+      
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Index' }],
+      });
+
     } catch (e) {
+      console.error("Logout failed", e);
       Alert.alert(t('logoutErrorTitle'), t('logoutErrorMessage'));
     }
   };
@@ -123,6 +127,7 @@ const ProfileScreen = () => {
   );
 };
 
+// --- الأنماط بعد التعديل ---
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
   header: { height: 200, overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, },
@@ -132,10 +137,35 @@ const styles = {
   profileName: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.primaryText, marginTop: 12 }),
   menuContainer: { paddingHorizontal: 20, marginTop: 40 },
   menuSection: (theme) => ({ backgroundColor: theme.surface, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }),
-  settingsItem: (theme) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15 }),
-  settingsItemContent: { alignItems: 'center', flex: 1 },
-  settingsItemText: (theme) => ({ fontSize: 17, color: theme.primaryText }),
-  separator: (theme) => ({ height: StyleSheet.hairlineWidth, backgroundColor: theme.separator, marginLeft: 54 }),
+  
+  // ✅✅✅ [الإصلاح الرئيسي هنا]: تم تعديل الـ Style الخاص بالعنصر ✅✅✅
+  settingsItem: (theme) => ({ 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 15, 
+    paddingVertical: 15 
+  }),
+  settingsItemContent: { 
+    alignItems: 'center', 
+    flex: 1 
+  },
+  settingsItemIcon: (isRTL) => ({
+    // هنا بنحدد الهامش بناءً على اللغة
+    marginRight: isRTL ? 0 : 15,
+    marginLeft: isRTL ? 15 : 0,
+  }),
+  settingsItemText: (theme) => ({ 
+    fontSize: 17, 
+    color: theme.primaryText 
+  }),
+  separator: (theme) => ({ 
+    height: StyleSheet.hairlineWidth, 
+    backgroundColor: theme.separator, 
+    // بنخلي الفاصل يبدأ من بعد مكان الأيقونة
+    marginLeft: 54,
+    marginRight: 54 // نضيف دي احتياطي عشان لو الشاشة اتعكست
+  }),
 };
 
 export default ProfileScreen;

@@ -1,9 +1,13 @@
-// File: emailverification.js (الكود الكامل والنهائي)
+// File: emailverification.js (تمت إعادة هيكلته ليعمل بشكل صحيح مع لوحة المفاتيح)
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
-  TouchableOpacity, StatusBar, Dimensions, Image, Animated, Alert, ActivityIndicator
+  TouchableOpacity, StatusBar, Dimensions, Image, Animated, Alert, ActivityIndicator,
+  // === تمت إضافة المكونات الضرورية ===
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -13,9 +17,7 @@ import { supabase } from './supabaseclient'; // تأكد من المسار ال�
 
 const { width, height } = Dimensions.get('window');
 
-// ==========================================================
-// ===== الثيمات والترجمات =====
-// ==========================================================
+// --- الثيمات والترجمات (بدون تغيير) ---
 const lightTheme = {
     primary: '#4CAF50', secondary: '#2ECC71', background: '#FFFFFF', textPrimary: '#212529',
     textSecondary: '#6C757D', borderColor: '#E9ECEF', headerText: '#FFFFFF', statusBar: 'light-content', otpBoxBackground: '#F7F8F9',
@@ -43,13 +45,25 @@ const translations = {
     }
 };
 
-const HeaderCurve = ({ theme }) => (
-  <View style={styles.headerCurveContainer}>
-    <Svg height={height * 0.18} width={width} viewBox={`0 0 ${width} ${height * 0.18}`}>
-      <Defs><LinearGradient id="grad-verify" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={theme.primary} /><Stop offset="1" stopColor={theme.secondary} /></LinearGradient></Defs>
-      <Path d={`M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`} fill="url(#grad-verify)"/>
-    </Svg>
-  </View>
+// مكون الهيدر المدمج ليتم وضعه داخل ScrollView
+const HeaderComponent = ({ theme, isRTL, navigation, title }) => (
+    <View style={styles.headerContainer}>
+        <Svg height={height * 0.18} width={width} style={{ position: 'absolute', top: 0 }}>
+            <Defs>
+                <LinearGradient id="grad-verify" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor={theme.primary} />
+                    <Stop offset="1" stopColor={theme.secondary} />
+                </LinearGradient>
+            </Defs>
+            <Path d={`M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`} fill="url(#grad-verify)" />
+        </Svg>
+        <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
+                <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle(theme)}>{title}</Text>
+        </View>
+    </View>
 );
 
 const EmailVerificationScreen = ({ navigation }) => {
@@ -66,7 +80,7 @@ const EmailVerificationScreen = ({ navigation }) => {
     const t = (key) => translations[language]?.[key] || key;
 
     useEffect(() => {
-      if (route.params?.email) setEmail(route.params.email);
+        if (route.params?.email) setEmail(route.params.email);
     }, [route.params?.email]);
 
     useFocusEffect(
@@ -114,53 +128,75 @@ const EmailVerificationScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container(theme)}>
+        <SafeAreaView style={styles.safeArea(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.primary} />
-            <HeaderCurve theme={theme} />
-            <View style={styles.headerContent}>
-                <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-                    <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle(theme)}>{t('headerTitle')}</Text>
-            </View>
-            <View style={styles.formContainer}>
-                <Text style={styles.title(theme)}>{t('title')}</Text>
-                <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
-                <View style={styles.otpContainer(isRTL)}>
-                    {otp.map((digit, index) => (
-                        <Animated.View key={index} style={{ transform: [{ scale: scaleAnim[index] }] }}>
-                            <TextInput
-                                ref={(input) => (inputs.current[index] = input)}
-                                style={styles.otpBox(theme)}
-                                keyboardType="number-pad"
-                                maxLength={1}
-                                onChangeText={(text) => handleOtpChange(text, index)}
-                                onKeyPress={(e) => handleBackspace(e, index)}
-                                value={digit}
-                            />
-                        </Animated.View>
-                    ))}
-                </View>
-                <View style={styles.resendContainer(isRTL)}>
-                    <Text style={styles.resendText(theme)}>{t('resendPrompt')}</Text>
-                    <TouchableOpacity><Text style={styles.resendButtonText(theme)}>{t('resendButton')}</Text></TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.verifyButton(theme)} onPress={handleVerify} disabled={loading}>
-                    {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.verifyButtonText(theme)}>{t('verifyButton')}</Text>}
-                </TouchableOpacity>
-            </View>
-            <Image source={require('./assets/leavesdecoration.png')} style={styles.footerImage} />
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{flex: 1}}
+            >
+                <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    
+                    <HeaderComponent 
+                        theme={theme} 
+                        isRTL={isRTL} 
+                        navigation={navigation} 
+                        title={t('headerTitle')}
+                    />
+
+                    <View style={styles.formContainer}>
+                        <Text style={styles.title(theme)}>{t('title')}</Text>
+                        <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
+                        <View style={styles.otpContainer(isRTL)}>
+                            {otp.map((digit, index) => (
+                                <Animated.View key={index} style={{ transform: [{ scale: scaleAnim[index] }] }}>
+                                    <TextInput
+                                        ref={(input) => (inputs.current[index] = input)}
+                                        style={styles.otpBox(theme)}
+                                        keyboardType="number-pad"
+                                        maxLength={1}
+                                        onChangeText={(text) => handleOtpChange(text, index)}
+                                        onKeyPress={(e) => handleBackspace(e, index)}
+                                        value={digit}
+                                    />
+                                </Animated.View>
+                            ))}
+                        </View>
+                        <View style={styles.resendContainer(isRTL)}>
+                            <Text style={styles.resendText(theme)}>{t('resendPrompt')}</Text>
+                            <TouchableOpacity><Text style={styles.resendButtonText(theme)}>{t('resendButton')}</Text></TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={styles.verifyButton(theme)} onPress={handleVerify} disabled={loading}>
+                            {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.verifyButtonText(theme)}>{t('verifyButton')}</Text>}
+                        </TouchableOpacity>
+                    </View>
+                    
+                    <View>
+                        <Image source={require('./assets/leavesdecoration.png')} style={styles.footerImage} />
+                    </View>
+
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
 
+// ==========================================================
+// ===== ✅ الأنماط النهائية التي تطابق سلوك شاشة تسجيل الدخول ✅ =====
+// ==========================================================
 const styles = {
-    container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    headerCurveContainer: { position: 'absolute', top: 0, left: 0, right: 0 },
-    headerContent: { marginTop: StatusBar.currentHeight || 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+    safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
+    
+    headerContainer: { height: height * 0.22 },
+    headerContent: { marginTop: (StatusBar.currentHeight || 40) + 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
     backButton: (isRTL) => ({ padding: 10, position: 'absolute', [isRTL ? 'right' : 'left']: 15, zIndex: 1 }),
     headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.headerText, textAlign: 'center', flex: 1 }),
-    formContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 80 },
+    
+    formContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        paddingHorizontal: 30, 
+        paddingBottom: 20 
+    },
     title: (theme) => ({ fontSize: 26, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'center', marginBottom: 15 }),
     subtitle: (theme) => ({ fontSize: 15, color: theme.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 22, maxWidth: '90%', alignSelf: 'center' }),
     otpContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', width: '100%', marginBottom: 20 }),
@@ -170,7 +206,8 @@ const styles = {
     resendButtonText: (theme) => ({ fontSize: 14, color: theme.primary, fontWeight: 'bold' }),
     verifyButton: (theme) => ({ backgroundColor: theme.primary, paddingVertical: 18, borderRadius: 12, alignItems: 'center', width: '100%', shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 }),
     verifyButtonText: (theme) => ({ color: theme.headerText, fontSize: 18, fontWeight: 'bold' }),
-    footerImage: { position: 'absolute', bottom: 0, width: width, height: 80, resizeMode: 'cover' },
+    
+    footerImage: { width: width, height: 80, resizeMode: 'cover' },
 };
 
 export default EmailVerificationScreen;

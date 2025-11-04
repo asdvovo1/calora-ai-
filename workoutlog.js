@@ -1,32 +1,18 @@
-// WorkoutLogScreen.js
-
+// WorkoutLogScreen.js - الكود الكامل بالربط الفعلي
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet, View, Text, SafeAreaView, TouchableOpacity,
-    TextInput, FlatList, Alert, Modal, StatusBar
+    TextInput, FlatList, Alert, Modal, StatusBar, ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+// ✅ *** REAL GOOGLE FIT INTEGRATION ***: استيراد المكتبة
+import GoogleFit from 'react-native-google-fit';
 
-// =====================================================================================
-// --- 1. الثيمات والترجمات ---
-// =====================================================================================
 
-const wlLightTheme = {
-    primary: '#388E3C', background: '#E8F5E9', card: '#FFFFFF', textPrimary: '#212121',
-    textSecondary: '#757575', disabled: '#BDBDBD', inputBackground: '#F5F5F5',
-    overlay: 'rgba(0,0,0,0.5)', statusBar: 'dark-content', cancelButton: '#eee',
-    cancelButtonText: '#212121', iconContainer: '#C8E6C9', white: '#FFFFFF',
-};
-
-const wlDarkTheme = {
-    primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF',
-    textSecondary: '#B0B0B0', disabled: '#424242', inputBackground: '#2C2C2C',
-    overlay: 'rgba(0,0,0,0.7)', statusBar: 'light-content', cancelButton: '#333333',
-    cancelButtonText: '#FFFFFF', iconContainer: '#2E7D32', white: '#FFFFFF',
-};
-
+const wlLightTheme = { primary: '#388E3C', background: '#E8F5E9', card: '#FFFFFF', textPrimary: '#212121', textSecondary: '#757575', disabled: '#BDBDBD', inputBackground: '#F5F5F5', overlay: 'rgba(0,0,0,0.5)', statusBar: 'dark-content', cancelButton: '#eee', cancelButtonText: '#212121', iconContainer: '#C8E6C9', white: '#FFFFFF', };
+const wlDarkTheme = { primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF', textSecondary: '#B0B0B0', disabled: '#424242', inputBackground: '#2C2C2C', overlay: 'rgba(0,0,0,0.7)', statusBar: 'light-content', cancelButton: '#333333', cancelButtonText: '#FFFFFF', iconContainer: '#2E7D32', white: '#FFFFFF', };
 const wlTranslations = {
     ar: {
         headerTitle: 'تمارين اليوم', caloriesBurned: 'سعر حراري محروق', emptyTitle: 'لا توجد تمارين مسجلة',
@@ -37,7 +23,10 @@ const wlTranslations = {
         exerciseNamePlaceholder: 'اسم التمرين', intensityLabel: 'اختر شدة التمرين:', low: 'خفيفة', medium: 'متوسطة', high: 'عالية',
         errorTitle: 'خطأ', invalidDuration: 'الرجاء إدخال مدة صحيحة بالدقائق.', errorSavingWorkout: 'حدث خطأ أثناء حفظ التمرين.',
         missingName: 'الرجاء إدخال اسم للتمرين.', successTitle: 'نجاح',
-        customExerciseAdded: 'تم إضافة التمرين المخصص بنجاح!', errorSavingCustom: 'حدث خطأ أثناء حفظ التمرين المخصص.', minutesUnit: 'دقيقة', caloriesUnit: 'سعر حراري'
+        customExerciseAdded: 'تم إضافة التمرين المخصص بنجاح!', errorSavingCustom: 'حدث خطأ أثناء حفظ التمرين المخصص.', 
+        minutesUnit: 'دقيقة', caloriesUnit: 'سعر حراري',
+        syncSuccess: 'تم مزامنة {count} تمرين جديد من Google Fit!', syncUpToDate: 'سجل تمارينك محدّث بالفعل.',
+        syncNoWorkouts: 'لم يتم العثور على تمارين في Google Fit لهذا اليوم.', syncError: 'تعذرت المزامنة مع Google Fit.',
     },
     en: {
         headerTitle: "Today's Workout", caloriesBurned: 'Calories Burned', emptyTitle: 'No Workouts Logged',
@@ -45,22 +34,17 @@ const wlTranslations = {
         searchPlaceholder: 'Search for an exercise...', addCustomButtonText: "Can't find your exercise? Add a new one",
         noResults: 'No search results', detailsTitle: 'Add Details for "{exerciseName}"',
         durationPlaceholder: 'Duration (in minutes)', cancel: 'Cancel', save: 'Save', createCustomTitle: 'Create Custom Exercise',
-        exerciseNamePlaceholder: 'Exercise Name', intensityLabel: 'Choose exercise intensity:', low: 'Low', medium: 'Medium', high: 'High',
+        exerciseNamePlaceholder: 'Exercise Name', intensityLabel: 'Choose exercise intensity:', low: 'Low', medium: 'Moderate', high: 'High',
         errorTitle: 'Error', invalidDuration: 'Please enter a valid duration in minutes.', errorSavingWorkout: 'An error occurred while saving the workout.',
         missingName: 'Please enter a name for the exercise.', successTitle: 'Success',
-        customExerciseAdded: 'Custom exercise added successfully!', errorSavingCustom: 'An error occurred while saving the custom exercise.', minutesUnit: 'min', caloriesUnit: 'kcal'
+        customExerciseAdded: 'Custom exercise added successfully!', errorSavingCustom: 'An error occurred while saving the custom exercise.', 
+        minutesUnit: 'min', caloriesUnit: 'kcal',
+        syncSuccess: '{count} new workout(s) synced from Google Fit!', syncUpToDate: 'Your workout log is already up to date.',
+        syncNoWorkouts: 'No workouts found in Google Fit for today.', syncError: 'Could not sync workouts from Google Fit.',
     }
 };
-
-const WL_BASE_EXERCISES = [
-    { id: '101', name: { ar: 'بنش برس بالبار', en: 'Barbell Bench Press' }, icon: 'weight-lifter', met: 5.0 }, { id: '102', name: { ar: 'بنش برس بالدمبل', en: 'Dumbbell Bench Press' }, icon: 'dumbbell', met: 5.0 }, { id: '103', name: { ar: 'تمرين الضغط', en: 'Push-ups' }, icon: 'weight-lifter', met: 8.0 }, { id: '104', name: { ar: 'تفتيح بالدمبل', en: 'Dumbbell Flyes' }, icon: 'dumbbell', met: 4.0 }, { id: '105', name: { ar: 'العقلة', en: 'Pull-ups' }, icon: 'weight-lifter', met: 8.0 }, { id: '106', name: { ar: 'سحب بالبار (تجديف)', en: 'Barbell Row' }, icon: 'weight-lifter', met: 5.5 }, { id: '107', name: { ar: 'سحب بالدمبل (تجديف)', en: 'Dumbbell Row' }, icon: 'dumbbell', met: 5.5 }, { id: '108', name: { ar: 'جهاز السحب الأرضي', en: 'Seated Cable Row' }, icon: 'weight-lifter', met: 4.5 }, { id: '109', name: { ar: 'سكوات بالبار', en: 'Barbell Squat' }, icon: 'weight-lifter', met: 6.0 }, { id: '110', name: { ar: 'جهاز ضغط الأرجل', en: 'Leg Press' }, icon: 'weight-lifter', met: 5.0 }, { id: '111', name: { ar: 'الطعنات (Lunges)', en: 'Lunges' }, icon: 'weight-lifter', met: 5.0 }, { id: '112', name: { ar: 'الرفعة الميتة (Deadlift)', en: 'Deadlift' }, icon: 'weight-lifter', met: 6.5 }, { id: '113', name: { ar: 'ضغط أكتاف بالدمبل', en: 'Dumbbell Shoulder Press' }, icon: 'dumbbell', met: 4.5 }, { id: '114', name: { ar: 'تمارين بايسبس بالدمبل', en: 'Dumbbell Bicep Curls' }, icon: 'dumbbell', met: 4.0 }, { id: '115', name: { ar: 'تمارين ترايسبس', en: 'Triceps Extensions' }, icon: 'dumbbell', met: 4.0 }, { id: '201', name: { ar: 'جهاز المشي - سرعة 6 كم/س', en: 'Treadmill - 6 km/h' }, icon: 'run', met: 4.3 }, { id: '202', name: { ar: 'جهاز المشي - سرعة 10 كم/س', en: 'Treadmill - 10 km/h' }, icon: 'run-fast', met: 10.0 }, { id: '203', name: { ar: 'جهاز المشي (مع ميلان)', en: 'Treadmill (Incline)' }, icon: 'run-fast', met: 11.0 }, { id: '204', name: { ar: 'جهاز الإليبتيكال (خفيف)', en: 'Elliptical (Light)' }, icon: 'elliptical', met: 5.0 }, { id: '205', name: { ar: 'جهاز الإليبتيكال (متوسط)', en: 'Elliptical (Moderate)' }, icon: 'elliptical', met: 7.0 }, { id: '206', name: { ar: 'دراجة هوائية ثابتة (متوسط)', en: 'Stationary Bike (Moderate)' }, icon: 'bike-fast', met: 7.0 }, { id: '207', name: { ar: 'جهاز التجديف (متوسط)', en: 'Rowing Machine (Moderate)' }, icon: 'rowing', met: 7.0 }, { id: '301', name: { ar: 'زومبا', en: 'Zumba' }, icon: 'human-female-dance', met: 7.5 }, { id: '302', name: { ar: 'سبيننج', en: 'Spinning' }, icon: 'bike-fast', met: 8.5 }, { id: '303', name: { ar: 'بودي بمب', en: 'BodyPump' }, icon: 'kettlebell', met: 6.0 }, { id: '304', name: { ar: 'انسانيتي', en: 'Insanity' }, icon: 'fire', met: 12.0 }, { id: '401', name: { ar: 'سباحة (عام)', en: 'Swimming (General)' }, icon: 'swim', met: 8.0 }, { id: '402', name: { ar: 'يوجا', en: 'Yoga' }, icon: 'yoga', met: 2.5 }, { id: '403', name: { ar: 'بيلاتس', en: 'Pilates' }, icon: 'yoga', met: 3.0 }, { id: '404', name: { ar: 'قفز الحبل', en: 'Jump Rope' }, icon: 'jump-rope', met: 12.3 }, { id: '405', name: { ar: 'كرة قدم', en: 'Soccer' }, icon: 'soccer', met: 7.0 }, { id: '406', name: { ar: 'كرة سلة', en: 'Basketball' }, icon: 'basketball', met: 8.0 }, { id: '407', name: { ar: 'تنس', en: 'Tennis' }, icon: 'tennis', met: 7.3 }, { id: '408', name: { ar: 'تسلق الجبال', en: 'Hiking' }, icon: 'hiking', met: 6.0 }, { id: '409', name: { ar: 'ملاكمة', en: 'Boxing' }, icon: 'boxing-glove', met: 9.0 }, { id: '410', name: { ar: 'ركوب الخيل', en: 'Horseback Riding' }, icon: 'horse-human', met: 5.5 }, { id: '411', name: { ar: 'البولينج', en: 'Bowling' }, icon: 'bowling', met: 3.0 }, { id: '501', name: { ar: 'العمل المكتبي/الكتابة', en: 'Office Work/Typing' }, icon: 'desktop-mac-dashboard', met: 1.5 }, { id: '502', name: { ar: 'الوقوف', en: 'Standing' }, icon: 'human-male', met: 1.8 }, { id: '503', name: { ar: 'القيادة', en: 'Driving' }, icon: 'car-side', met: 2.0 }, { id: '504', name: { ar: 'حمل أغراض البقالة', en: 'Carrying Groceries' }, icon: 'cart-outline', met: 3.0 }, { id: '505', name: { ar: 'اللعب مع الحيوانات الأليفة', en: 'Playing with Pets' }, icon: 'dog', met: 3.0 }, { id: '506', name: { ar: 'قص العشب', en: 'Mowing Lawn' }, icon: 'grass', met: 5.0 }, { id: '507', name: { ar: 'تنظيف المنزل (عام)', en: 'House Cleaning (General)' }, icon: 'broom', met: 3.5 }, { id: '508', name: { ar: 'الطهي', en: 'Cooking' }, icon: 'chef-hat', met: 2.5 }, { id: '509', name: { ar: 'جرف الثلج', en: 'Shoveling Snow' }, icon: 'snowflake', met: 6.0 }, { id: '601', name: { ar: 'مشي (خفيف)', en: 'Walking (Light)' }, icon: 'walk', met: 2.5 }, { id: '602', name: { ar: 'ركض (متوسط)', en: 'Running (Moderate)' }, icon: 'run', met: 9.8 }, { id: '603', name: { ar: 'فنون قتالية (كاراتيه/جودو)', en: 'Martial Arts (Karate/Judo)' }, icon: 'karate', met: 10.3 }, { id: '605', name: { ar: 'تمارين الإطالة', en: 'Stretching' }, icon: 'stretching', met: 2.3 },
-];
-
-const getExerciseName = (name, lang) => {
-    if (typeof name === 'object' && name !== null) { return name[lang] || name['en']; }
-    return name;
-};
-
+const WL_BASE_EXERCISES = [ { id: '101', name: { ar: 'بنش برس بالبار', en: 'Barbell Bench Press' }, icon: 'weight-lifter', met: 5.0 }, { id: '102', name: { ar: 'بنش برس بالدمبل', en: 'Dumbbell Bench Press' }, icon: 'dumbbell', met: 5.0 }, { id: '103', name: { ar: 'تمرين الضغط', en: 'Push-ups' }, icon: 'weight-lifter', met: 8.0 }, { id: '104', name: { ar: 'تفتيح بالدمبل', en: 'Dumbbell Flyes' }, icon: 'dumbbell', met: 4.0 }, { id: '105', name: { ar: 'العقلة', en: 'Pull-ups' }, icon: 'weight-lifter', met: 8.0 }, { id: '106', name: { ar: 'سحب بالبار (تجديف)', en: 'Barbell Row' }, icon: 'weight-lifter', met: 5.5 }, { id: '107', name: { ar: 'سحب بالدمبل (تجديف)', en: 'Dumbbell Row' }, icon: 'dumbbell', met: 5.5 }, { id: '108', name: { ar: 'جهاز السحب الأرضي', en: 'Seated Cable Row' }, icon: 'weight-lifter', met: 4.5 }, { id: '109', name: { ar: 'سكوات بالبار', en: 'Barbell Squat' }, icon: 'weight-lifter', met: 6.0 }, { id: '110', name: { ar: 'جهاز ضغط الأرجل', en: 'Leg Press' }, icon: 'weight-lifter', met: 5.0 }, { id: '111', name: { ar: 'الطعنات (Lunges)', en: 'Lunges' }, icon: 'weight-lifter', met: 5.0 }, { id: '112', name: { ar: 'الرفعة الميتة (Deadlift)', en: 'Deadlift' }, icon: 'weight-lifter', met: 6.5 }, { id: '113', name: { ar: 'ضغط أكتاف بالدمبل', en: 'Dumbbell Shoulder Press' }, icon: 'dumbbell', met: 4.5 }, { id: '114', name: { ar: 'تمارين بايسبس بالدمبل', en: 'Dumbbell Bicep Curls' }, icon: 'dumbbell', met: 4.0 }, { id: '115', name: { ar: 'تمارين ترايسبس', en: 'Triceps Extensions' }, icon: 'dumbbell', met: 4.0 }, { id: '201', name: { ar: 'جهاز المشي - سرعة 6 كم/س', en: 'Treadmill - 6 km/h' }, icon: 'run', met: 4.3 }, { id: '202', name: { ar: 'جهاز المشي - سرعة 10 كم/س', en: 'Treadmill - 10 km/h' }, icon: 'run-fast', met: 10.0 }, { id: '203', name: { ar: 'جهاز المشي (مع ميلان)', en: 'Treadmill (Incline)' }, icon: 'run-fast', met: 11.0 }, { id: '204', name: { ar: 'جهاز الإليبتيكال (خفيف)', en: 'Elliptical (Light)' }, icon: 'elliptical', met: 5.0 }, { id: '205', name: { ar: 'جهاز الإليبتيكال (متوسط)', en: 'Elliptical (Moderate)' }, icon: 'elliptical', met: 7.0 }, { id: '206', name: { ar: 'دراجة هوائية ثابتة (متوسط)', en: 'Stationary Bike (Moderate)' }, icon: 'bike-fast', met: 7.0 }, { id: '207', name: { ar: 'جهاز التجديف (متوسط)', en: 'Rowing Machine (Moderate)' }, icon: 'rowing', met: 7.0 }, { id: '301', name: { ar: 'زومبا', en: 'Zumba' }, icon: 'human-female-dance', met: 7.5 }, { id: '302', name: { ar: 'سبيننج', en: 'Spinning' }, icon: 'bike-fast', met: 8.5 }, { id: '303', name: { ar: 'بودي بمب', en: 'BodyPump' }, icon: 'kettlebell', met: 6.0 }, { id: '304', name: { ar: 'انسانيتي', en: 'Insanity' }, icon: 'fire', met: 12.0 }, { id: '401', name: { ar: 'سباحة (عام)', en: 'Swimming (General)' }, icon: 'swim', met: 8.0 }, { id: '402', name: { ar: 'يوجا', en: 'Yoga' }, icon: 'yoga', met: 2.5 }, { id: '403', name: { ar: 'بيلاتس', en: 'Pilates' }, icon: 'yoga', met: 3.0 }, { id: '404', name: { ar: 'قفز الحبل', en: 'Jump Rope' }, icon: 'jump-rope', met: 12.3 }, { id: '405', name: { ar: 'كرة قدم', en: 'Football (Soccer)' }, icon: 'soccer', met: 7.0 }, { id: '406', name: { ar: 'كرة سلة', en: 'Basketball' }, icon: 'basketball', met: 8.0 }, { id: '407', name: { ar: 'تنس', en: 'Tennis' }, icon: 'tennis', met: 7.3 }, { id: '408', name: { ar: 'تسلق الجبال', en: 'Hiking' }, icon: 'hiking', met: 6.0 }, { id: '409', name: { ar: 'ملاكمة', en: 'Boxing' }, icon: 'boxing-glove', met: 9.0 }, { id: '410', name: { ar: 'ركوب الخيل', en: 'Horseback Riding' }, icon: 'horse-human', met: 5.5 }, { id: '411', name: { ar: 'البولينج', en: 'Bowling' }, icon: 'bowling', met: 3.0 }, { id: '501', name: { ar: 'العمل المكتبي/الكتابة', en: 'Office Work/Typing' }, icon: 'desktop-mac-dashboard', met: 1.5 }, { id: '502', name: { ar: 'الوقوف', en: 'Standing' }, icon: 'human-male', met: 1.8 }, { id: '503', name: { ar: 'القيادة', en: 'Driving' }, icon: 'car-side', met: 2.0 }, { id: '504', name: { ar: 'حمل أغراض البقالة', en: 'Carrying Groceries' }, icon: 'cart-outline', met: 3.0 }, { id: '505', name: { ar: 'اللعب مع الحيوانات الأليفة', en: 'Playing with Pets' }, icon: 'dog', met: 3.0 }, { id: '506', name: { ar: 'قص العشب', en: 'Mowing Lawn' }, icon: 'grass', met: 5.0 }, { id: '507', name: { ar: 'تنظيف المنزل (عام)', en: 'House Cleaning (General)' }, icon: 'broom', met: 3.5 }, { id: '508', name: { ar: 'الطهي', en: 'Cooking' }, icon: 'chef-hat', met: 2.5 }, { id: '509', name: { ar: 'جرف الثلج', en: 'Shoveling Snow' }, icon: 'snowflake', met: 6.0 }, { id: '601', name: { ar: 'مشي', en: 'Walking' }, icon: 'walk', met: 3.5 }, { id: '602', name: { ar: 'ركض', en: 'Running' }, icon: 'run', met: 9.8 }, { id: '603', name: { ar: 'فنون قتالية (كاراتيه/جودو)', en: 'Martial Arts (Karate/Judo)' }, icon: 'karate', met: 10.3 }, { id: '605', name: { ar: 'تمارين الإطالة', en: 'Stretching' }, icon: 'stretching', met: 2.3 }, ];
+const getExerciseName = (name, lang) => { if (typeof name === 'object' && name !== null) { return name[lang] || name['en']; } return name; };
 const formatDateKeyForToday = () => new Date().toISOString().slice(0, 10);
 
 function WorkoutLogScreen({ route, navigation }) {
@@ -79,6 +63,8 @@ function WorkoutLogScreen({ route, navigation }) {
     const [exerciseList, setExerciseList] = useState(WL_BASE_EXERCISES);
     const [customExerciseName, setCustomExerciseName] = useState('');
     const [customExerciseIntensity, setCustomExerciseIntensity] = useState('medium');
+    const [isGFConnected, setIsGFConnected] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -97,6 +83,8 @@ function WorkoutLogScreen({ route, navigation }) {
                     } else {
                         setExercises([]);
                     }
+                    const googleFitStatus = await AsyncStorage.getItem('isGoogleFitConnected') === 'true';
+                    setIsGFConnected(googleFitStatus);
                 } catch (e) { console.error("Failed to load settings or data", e); }
             };
             loadSettingsAndData();
@@ -182,6 +170,75 @@ function WorkoutLogScreen({ route, navigation }) {
             Alert.alert(t('errorTitle'), t('errorSavingCustom'));
         }
     };
+
+    // ✅ *** REAL GOOGLE FIT INTEGRATION ***: المزامنة الفعلية
+    const handleSyncWithGoogleFit = async () => {
+        if (!isGFConnected || !GoogleFit.isAuthorized) {
+            Alert.alert("Not Connected", "Please connect to Google Fit from the settings screen first.");
+            return;
+        }
+        setIsSyncing(true);
+        const dayStart = new Date(dateKey); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dateKey); dayEnd.setHours(23, 59, 59, 999);
+        const options = { startDate: dayStart.toISOString(), endDate: dayEnd.toISOString() };
+
+        try {
+            const activitySamples = await GoogleFit.getActivitySamples(options);
+            if (!activitySamples || activitySamples.length === 0) {
+                Alert.alert(t('successTitle'), t('syncNoWorkouts'));
+                setIsSyncing(false);
+                return;
+            }
+
+            let newWorkoutsFromGF = [];
+            const weightKg = 70; // وزن افتراضي لحساب السعرات
+
+            activitySamples.forEach(sample => {
+                if (!sample.activity || !sample.startDate || !sample.endDate) return;
+                const durationMinutes = Math.round((new Date(sample.endDate) - new Date(sample.startDate)) / 60000);
+                if(durationMinutes <= 0) return;
+
+                // محاولة مطابقة التمرين مع القائمة الموجودة
+                let matchedExercise = exerciseList.find(ex => getExerciseName(ex.name, 'en').toLowerCase().includes(sample.activity.toLowerCase()));
+                if (!matchedExercise) {
+                    matchedExercise = { name: { en: sample.activity, ar: sample.activity }, met: 5.0, icon: 'weight-lifter' }; // تمرين افتراضي
+                }
+                
+                // حساب السعرات الحرارية
+                const caloriesBurned = sample.calories || Math.round((matchedExercise.met * 3.5 * weightKg) / 200 * durationMinutes);
+                
+                newWorkoutsFromGF.push({
+                    exerciseId: matchedExercise.id || `gf_${sample.activity}`,
+                    name: getExerciseName(matchedExercise.name, language),
+                    duration: durationMinutes,
+                    calories: Math.round(caloriesBurned),
+                    icon: matchedExercise.icon,
+                    id: `glogged_${sample.startDate}` // ID فريد لتجنب التكرار
+                });
+            });
+            
+            const dayJson = await AsyncStorage.getItem(dateKey);
+            let dayData = dayJson ? JSON.parse(dayJson) : { exercises: [] };
+            const existingIds = new Set(dayData.exercises.map(ex => ex.id));
+            const uniqueNewWorkouts = newWorkoutsFromGF.filter(ex => !existingIds.has(ex.id));
+
+            if (uniqueNewWorkouts.length > 0) {
+                const updatedExercises = [...dayData.exercises, ...uniqueNewWorkouts];
+                dayData.exercises = updatedExercises;
+                await AsyncStorage.setItem(dateKey, JSON.stringify(dayData));
+                setExercises(updatedExercises);
+                Alert.alert(t('successTitle'), t('syncSuccess').replace('{count}', uniqueNewWorkouts.length));
+            } else {
+                Alert.alert(t('successTitle'), t('syncUpToDate'));
+            }
+
+        } catch (error) {
+            console.error("Error syncing with Google Fit:", error);
+            Alert.alert(t('errorTitle'), t('syncError'));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
     
     const totalCaloriesBurned = exercises.reduce((sum, ex) => sum + (ex.calories || 0), 0);
     
@@ -193,22 +250,8 @@ function WorkoutLogScreen({ route, navigation }) {
         </View>
     );
 
-    // --- START: تعديل جذري لمكون عرض التمرين ---
     const ExerciseListItem = ({ item }) => {
-        let originalExercise = null;
-
-        // 1. حاول البحث باستخدام الـ ID (للتوافق مع البيانات الجديدة)
-        if (item.exerciseId) {
-            originalExercise = exerciseList.find(ex => ex.id === item.exerciseId);
-        } 
-        // 2. إذا لم يوجد ID (بيانات قديمة)، قم ببحث عكسي باستخدام الاسم الإنجليزي
-        else if (item.name && typeof item.name === 'string') {
-             originalExercise = exerciseList.find(ex => 
-                getExerciseName(ex.name, 'en').toLowerCase() === item.name.toLowerCase()
-             );
-        }
-        
-        // 3. اعرض الاسم المترجم إن وجد، وإلا اعرض الاسم المحفوظ
+        let originalExercise = exerciseList.find(ex => ex.id === item.exerciseId);
         const displayName = originalExercise 
             ? getExerciseName(originalExercise.name, language) 
             : getExerciseName(item.name, language);
@@ -225,7 +268,6 @@ function WorkoutLogScreen({ route, navigation }) {
             </View>
         );
     };
-    // --- END: تعديل مكون عرض التمرين ---
 
     const ListHeader = () => (
         <View style={styles.summaryContainer(theme)}>
@@ -256,6 +298,11 @@ function WorkoutLogScreen({ route, navigation }) {
                     <View style={styles.modalHeader(theme, isRTL)}>
                         <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseButton}><Ionicons name="close" size={30} color={theme.primary} /></TouchableOpacity>
                         <Text style={styles.modalHeaderTitle(theme, isRTL)}>{t('addExerciseTitle')}</Text>
+                         {isGFConnected && (
+                            <TouchableOpacity onPress={handleSyncWithGoogleFit} disabled={isSyncing} style={{ padding: 5 }}>
+                                {isSyncing ? <ActivityIndicator color={theme.primary} /> : <MaterialCommunityIcons name="sync" size={28} color={theme.primary} />}
+                            </TouchableOpacity>
+                        )}
                     </View>
                     <View style={styles.searchContainer(theme)}><TextInput style={styles.searchInput(theme, isRTL)} placeholder={t('searchPlaceholder')} placeholderTextColor={theme.textSecondary} value={searchQuery} onChangeText={setSearchQuery} /></View>
                     <FlatList

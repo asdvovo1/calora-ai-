@@ -1,21 +1,21 @@
-// 🚀 --- السطر الجديد لحل مشكلة URL.hostname --- 🚀
+// App.js (النسخة النهائية الكاملة والمعدلة)
+
 import 'react-native-url-polyfill/auto';
-
-// ✅ --- هذا هو السطر الوحيد الذي تمت إضافته لحل مشكلة 'crypto' --- ✅
 import 'react-native-get-random-values';
-
-// --- باقي الكود كما هو ---
 import 'react-native-gesture-handler';
+
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, I18nManager } from 'react-native'; // <--- تم إضافة I18nManager
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { supabase } from './supabaseclient';
+import { supabase } from './supabaseclient'; 
+import * as Linking from 'expo-linking'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- تم إضافة AsyncStorage
 
 // --- استيراد الشاشات ---
 import SplashScreen from './Splash';
-import IndexScreen from './Index';
+import IndexScreen from './Index'; 
 import SignInScreen from './signin';
 import SignUpScreen from './signup';
 import ForgotPasswordScreen from './forgotpassword';
@@ -26,78 +26,114 @@ import MeasurementsScreen from './measurements';
 import GoalScreen from './goal';
 import ActivityLevelScreen from './activitylevel';
 import ResultsScreen from './results';
-import MainUI from './mainui';
-import ProfileScreen from './profile';
-import EditProfileScreen from './editprofile';
-import SettingsScreen from './setting';
-import AboutScreen from './about';
+import MainUI from './mainui'; 
 
 const Stack = createStackNavigator();
-
-// Navigator لشاشات المصادقة (التسجيل والدخول)
-const AuthStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="Index" component={IndexScreen} />
-    <Stack.Screen name="SignIn" component={SignInScreen} />
-    <Stack.Screen name="SignUp" component={SignUpScreen} />
-    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-    <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
-    <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-    <Stack.Screen name="BasicInfo" component={BasicInfoScreen} />
-    <Stack.Screen name="Measurements" component={MeasurementsScreen} />
-    <Stack.Screen name="Goal" component={GoalScreen} />
-    <Stack.Screen name="ActivityLevel" component={ActivityLevelScreen} />
-    <Stack.Screen name="Results" component={ResultsScreen} />
-  </Stack.Navigator>
-);
-
-// Navigator لشاشات التطبيق الرئيسية بعد تسجيل الدخول
-const MainAppStack = () => (
-  <Stack.Navigator initialRouteName="MainUI" screenOptions={{ headerShown: false, cardStyle: { flex: 1 } }}>
-    <Stack.Screen name="MainUI" component={MainUI} />
-    <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-    <Stack.Screen name="Settings" component={SettingsScreen} />
-    <Stack.Screen name="About" component={AboutScreen} />
-  </Stack.Navigator>
-);
 
 const App = () => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [appLanguage, setAppLanguage] = useState('en'); // <--- 1. أضفنا حالة اللغة هنا
+
+  // دالة التعامل مع الروابط العميقة (للمصادقة عبر OAuth)
+  const handleDeepLink = (url) => {
+    if (!url) return;
+    const params = url.split('#')[1];
+    if (params) {
+      const parsedParams = params.split('&').reduce((acc, part) => {
+        const [key, value] = part.split('=');
+        acc[decodeURIComponent(key)] = decodeURIComponent(value);
+        return acc;
+      }, {});
+      const { access_token, refresh_token } = parsedParams;
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ data }) => {
+           setSession(data.session);
+        });
+      }
+    }
+  };
 
   useEffect(() => {
     const initializeApp = async () => {
+      // --- 2. أضفنا كود تحميل اللغة ---
       try {
-        const sessionPromise = supabase.auth.getSession();
-        const minTimePromise = new Promise(resolve => setTimeout(resolve, 2000));
-        const [{ data }] = await Promise.all([sessionPromise, minTimePromise]);
-        setSession(data.session);
-      } catch (error) {
-        console.error("Initialization error:", error);
-        setSession(null);
-      } finally {
-        setLoading(false);
+        const savedLang = await AsyncStorage.getItem('appLanguage');
+        if (savedLang) {
+          setAppLanguage(savedLang);
+          I18nManager.forceRTL(savedLang === 'ar'); // تطبيق اتجاه اللغة فورًا
+        }
+      } catch (e) {
+        console.log('Failed to load language.');
       }
+      
+      // جلب الجلسة عند بدء تشغيل التطبيق (كودك الأصلي)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setIsOnboardingComplete(session?.user?.user_metadata?.onboarding_complete || false);
+        setTimeout(() => setLoading(false), 2000); 
+      });
     };
 
     initializeApp();
 
+    // الاستماع لأي تغيير في حالة تسجيل الدخول/الخروج
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setIsOnboardingComplete(session?.user?.user_metadata?.onboarding_complete || false);
     });
-
-    return () => subscription.unsubscribe();
+    
+    // التعامل مع الروابط العميقة
+    const linkSubscription = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    Linking.getInitialURL().then(url => handleDeepLink(url));
+    
+    return () => {
+      subscription.unsubscribe();
+      linkSubscription.remove();
+    };
   }, []);
 
   if (loading) {
     return <SplashScreen />;
   }
 
+  const getInitialRouteName = () => {
+    if (session && session.user) {
+      return isOnboardingComplete ? 'MainUI' : 'BasicInfo';
+    }
+    return 'Index';
+  };
+
   return (
     <SafeAreaProvider>
       <View style={styles.rootContainer}>
         <NavigationContainer>
-          {session && session.user ? <MainAppStack /> : <AuthStack />}
+          <Stack.Navigator 
+            initialRouteName={getInitialRouteName()} 
+            screenOptions={{ headerShown: false }}
+          >
+            {/* المستخدم غير مسجل دخول */}
+            <Stack.Screen name="Index" component={IndexScreen} />
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+            
+            {/* المستخدم مسجل ولكن لم يكمل الإعداد */}
+            <Stack.Screen name="BasicInfo" component={BasicInfoScreen} />
+            <Stack.Screen name="Measurements" component={MeasurementsScreen} />
+            <Stack.Screen name="Goal" component={GoalScreen} />
+            <Stack.Screen name="ActivityLevel" component={ActivityLevelScreen} />
+            <Stack.Screen name="Results" component={ResultsScreen} />
+            
+            {/* المستخدم مسجل وأكمل الإعداد */}
+            {/* --- 3. تعديل طريقة استدعاء MainUI لتمرير اللغة --- */}
+            <Stack.Screen name="MainUI">
+              {(props) => <MainUI {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+          </Stack.Navigator>
         </NavigationContainer>
       </View>
     </SafeAreaProvider>
@@ -105,10 +141,7 @@ const App = () => {
 };
 
 const styles = StyleSheet.create({
-  rootContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  rootContainer: { flex: 1, backgroundColor: '#fff' },
 });
 
 export default App;

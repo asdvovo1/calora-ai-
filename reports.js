@@ -24,7 +24,8 @@ const ReportsScreen = () => {
     const [theme, setTheme] = useState(lightTheme);
     const [language, setLanguage] = useState('ar');
     const [isRTL, setIsRTL] = useState(true);
-    const [period, setPeriod] = useState('3months');
+    // ✅ --- الحل هنا: تغيير القيمة الأولية إلى 'week' لتكون الافتراضية --- ✅
+    const [period, setPeriod] = useState('week');
     const [loading, setLoading] = useState(true);
     const [reportData, setReportData] = useState(null);
     const [selectedWeightPoint, setSelectedWeightPoint] = useState(null);
@@ -88,7 +89,6 @@ const ReportsScreen = () => {
                         nutrition: { 
                             avgCalories: daysWithNutritionData > 0 ? Math.round(totalCalories / daysWithNutritionData) : 0, 
                             macros: [ 
-                                // ✅ --- الحل هنا: استخدام المتوسط في خاصية 'population' --- ✅
                                 { name: translations[currentLang].protein, population: avgProtein || 1, color: '#FF7043', legendFontColor: currentTheme.textSecondary, legendFontSize: 14 }, 
                                 { name: translations[currentLang].carbs, population: avgCarbs || 1, color: '#007BFF', legendFontColor: currentTheme.textSecondary, legendFontSize: 14 }, 
                                 { name: translations[currentLang].fat, population: avgFat || 1, color: '#FFC107', legendFontColor: currentTheme.textSecondary, legendFontSize: 14 }, 

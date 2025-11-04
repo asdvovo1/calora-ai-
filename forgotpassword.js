@@ -1,9 +1,12 @@
-// File: forgotpassword.js (الكود الكامل والنهائي)
+// forgotpassword.js (تمت إعادة هيكلته ليعمل تماماً مثل شاشة تسجيل الدخول)
 
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
-  TouchableOpacity, StatusBar, Dimensions, Image, Alert, ActivityIndicator
+  TouchableOpacity, StatusBar, Dimensions, Image, Alert, ActivityIndicator,
+  KeyboardAvoidingView, 
+  Platform,
+  ScrollView 
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -13,9 +16,7 @@ import { supabase } from './supabaseclient'; // تأكد من المسار ال�
 
 const { width, height } = Dimensions.get('window');
 
-// ==========================================================
-// ===== الثيمات والترجمات =====
-// ==========================================================
+// --- الثيمات والترجمات (بدون تغيير) ---
 const lightTheme = {
     primary: '#4CAF50', secondary: '#2ECC71', background: '#FFFFFF', textPrimary: '#212529',
     textSecondary: '#6C757D', borderColor: '#E9ECEF', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#F7F8F9',
@@ -43,21 +44,28 @@ const translations = {
     }
 };
 
-const HeaderCurve = ({ theme }) => {
-  const pathData = `M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`;
-  return (
-    <View style={styles.headerCurveContainer}>
-      <Svg height={height * 0.18} width={width} viewBox={`0 0 ${width} ${height * 0.18}`}>
-        <Defs>
-          <LinearGradient id="grad-forgot" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={theme.primary} />
-            <Stop offset="1" stopColor={theme.secondary} />
-          </LinearGradient>
-        </Defs>
-        <Path d={pathData} fill="url(#grad-forgot)" />
-      </Svg>
-    </View>
-  );
+// Header مدمج ليتم وضعه داخل ScrollView
+const HeaderComponent = ({ theme, isRTL, navigation, title }) => {
+    const pathData = `M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`;
+    return (
+      <View style={styles.headerContainer}>
+        <Svg height={height * 0.18} width={width} style={{ position: 'absolute', top: 0 }}>
+          <Defs>
+            <LinearGradient id="grad-forgot" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0" stopColor={theme.primary} />
+              <Stop offset="1" stopColor={theme.secondary} />
+            </LinearGradient>
+          </Defs>
+          <Path d={pathData} fill="url(#grad-forgot)" />
+        </Svg>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
+            <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle(theme)}>{title}</Text>
+        </View>
+      </View>
+    );
 };
 
 const ForgotPasswordScreen = ({ navigation }) => {
@@ -85,10 +93,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         }, [])
     );
 
-    const validateEmail = (emailToValidate) => {
-        const emailRegex = /\S+@\S+\.\S+/;
-        return emailRegex.test(emailToValidate);
-    };
+    const validateEmail = (emailToValidate) => /\S+@\S+\.\S+/.test(emailToValidate);
 
     const handleRecover = async () => {
         if (!validateEmail(email)) {
@@ -97,9 +102,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         }
         setLoading(true);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), {
-                redirectTo: ' ', // مهم لمنع إعادة التوجيه
-            });
+            const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), { redirectTo: ' ' });
             if (error) {
                 Alert.alert(t('alertTitle'), error.message);
             } else {
@@ -115,49 +118,76 @@ const ForgotPasswordScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container(theme)}>
+        <SafeAreaView style={styles.safeArea(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.primary} />
-            <HeaderCurve theme={theme} />
-            <View style={styles.headerContent}>
-                <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-                    <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle(theme)}>{t('headerTitle')}</Text>
-            </View>
-            <View style={styles.formContainer}>
-                <Text style={styles.title(theme)}>{t('title')}</Text>
-                <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
-                <View style={styles.inputContainer(theme, isRTL)}>
-                    <Icon name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
-                    <TextInput
-                        placeholder={t('placeholderEmail')}
-                        placeholderTextColor={theme.textSecondary}
-                        style={styles.input(theme, isRTL)}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        value={email}
-                        onChangeText={setEmail}
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === "ios" ? "padding" : "height"} // نفس الإعدادات
+                style={{flex: 1}}
+            >
+                <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    
+                    {/* ===== 1. الهيدر أصبح جزءاً من المحتوى القابل للتمرير ===== */}
+                    <HeaderComponent 
+                        theme={theme} 
+                        isRTL={isRTL} 
+                        navigation={navigation} 
+                        title={t('headerTitle')}
                     />
-                </View>
-                <TouchableOpacity style={styles.recoverButton(theme)} onPress={handleRecover} disabled={loading}>
-                    {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.recoverButtonText(theme)}>{t('recoverButtonText')}</Text>}
-                </TouchableOpacity>
-            </View>
-            <Image
-                source={require('./assets/leavesdecoration.png')}
-                style={styles.footerImage}
-            />
+                    
+                    {/* ===== 2. النموذج يأتي بعد الهيدر مباشرة ===== */}
+                    <View style={styles.formContainer}>
+                        <Text style={styles.title(theme)}>{t('title')}</Text>
+                        <Text style={styles.subtitle(theme)}>{t('subtitle')}</Text>
+                        <View style={styles.inputContainer(theme, isRTL)}>
+                            <Icon name="mail" size={20} color={theme.textSecondary} style={styles.inputIcon(isRTL)} />
+                            <TextInput
+                                placeholder={t('placeholderEmail')}
+                                placeholderTextColor={theme.textSecondary}
+                                style={styles.input(theme, isRTL)}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={email}
+                                onChangeText={setEmail}
+                            />
+                        </View>
+                        <TouchableOpacity style={styles.recoverButton(theme)} onPress={handleRecover} disabled={loading}>
+                            {loading ? <ActivityIndicator color={theme.headerText} /> : <Text style={styles.recoverButtonText(theme)}>{t('recoverButtonText')}</Text>}
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* ===== 3. الصورة السفلية أصبحت جزءاً من المحتوى أيضاً ===== */}
+                    <View style={styles.footerImageContainer}>
+                      <Image
+                          source={require('./assets/leavesdecoration.png')}
+                          style={styles.footerImage}
+                      />
+                    </View>
+
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
 
+// ==========================================================
+// ===== ✅ الأنماط النهائية التي تطابق سلوك شاشة تسجيل الدخول ✅ =====
+// ==========================================================
 const styles = {
-    container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    headerCurveContainer: { position: 'absolute', top: 0, left: 0, right: 0 },
-    headerContent: { marginTop: StatusBar.currentHeight || 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+    safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
+
+    headerContainer: { height: height * 0.22 }, // إعطاء ارتفاع ثابت للهيدر
+    headerContent: { marginTop: (StatusBar.currentHeight || 40) + 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
     backButton: (isRTL) => ({ padding: 10, position: 'absolute', [isRTL ? 'right' : 'left']: 15, zIndex: 1 }),
     headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.headerText, textAlign: 'center', flex: 1 }),
-    formContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 80 },
+    
+    // تم تعديل هذا ليناسب التصميم الجديد
+    formContainer: {
+        flex: 1, // يأخذ المساحة المتبقية
+        justifyContent: 'center', // توسيط المحتوى
+        paddingHorizontal: 30,
+        paddingBottom: 20, // مسافة قبل الصورة
+    },
+
     title: (theme) => ({ fontSize: 24, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'center', marginBottom: 10 }),
     subtitle: (theme) => ({ fontSize: 15, color: theme.textSecondary, textAlign: 'center', marginBottom: 40, lineHeight: 22 }),
     inputContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', backgroundColor: theme.inputBackground, borderRadius: 12, paddingHorizontal: 15, marginBottom: 25, borderWidth: 1, borderColor: theme.borderColor, height: 58 }),
@@ -165,7 +195,12 @@ const styles = {
     input: (theme, isRTL) => ({ flex: 1, fontSize: 16, color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left' }),
     recoverButton: (theme) => ({ backgroundColor: theme.primary, paddingVertical: 18, borderRadius: 12, alignItems: 'center', marginTop: 10, shadowColor: theme.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 }),
     recoverButtonText: (theme) => ({ color: theme.headerText, fontSize: 18, fontWeight: 'bold' }),
-    footerImage: { position: 'absolute', bottom: 0, width: width, height: 80, resizeMode: 'cover' },
+    
+    // حاوية وصورة الفوتر الجديدة
+    footerImageContainer: {
+      // هذا يضمن أن الصورة تأتي في نهاية المحتوى
+    },
+    footerImage: { width: width, height: 80, resizeMode: 'cover' },
 };
 
 export default ForgotPasswordScreen;
