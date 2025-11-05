@@ -53,10 +53,10 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     // << أضف هذا السطر من جديد
-    namespace 'com.caloraai.app' 
+    namespace "com.caloraai.app" 
 
     defaultConfig {
-        applicationId 'com.caloraai.app'
+        applicationId "com.caloraai.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
