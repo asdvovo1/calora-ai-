@@ -13,14 +13,14 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', primaryText: '#1C1C1E', secondaryText: '#8A8A8E', separator: '#E5E5EA', logout: '#FF3B30', statusBar: 'dark-content', borderColor: '#FFFFFF' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', primaryText: '#FFFFFF', secondaryText: '#A5A5A5', separator: '#38383A', logout: '#EF5350', statusBar: 'light-content', borderColor: '#1E1E1E' };
 
-// ✅ مكون العنصر: يستقبل isRTL ويعكس الاتجاه يدوياً
+// ✅ التعديل: حذفنا row-reverse
 const SettingsItem = ({ icon, name, onPress, color, theme, isRTL }) => (
-    <TouchableOpacity style={styles.settingsItem(theme, isRTL)} onPress={onPress}>
-      <View style={styles.settingsItemContent(isRTL)}>
-        <View style={styles.settingsItemIcon(isRTL)}>{icon}</View>
-        <Text style={[styles.settingsItemText(theme, isRTL), { color: color || theme.primaryText }]}>{name}</Text>
+    <TouchableOpacity style={styles.settingsItem(theme)} onPress={onPress}>
+      <View style={styles.settingsItemContent}>
+        <View style={styles.settingsItemIcon}>{icon}</View>
+        <Text style={[styles.settingsItemText(theme), { color: color || theme.primaryText }]}>{name}</Text>
       </View>
-      {/* عكس السهم */}
+      {/* عكس السهم فقط */}
       <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
     </TouchableOpacity>
 );
@@ -31,15 +31,22 @@ const ProfileScreen = ({ appLanguage }) => {
   const navigation = useNavigation();
   const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // ✅ استخدام اللغة الممررة من App.js أو الافتراضية
-  const language = appLanguage || 'en';
-  const isRTL = language === 'ar';
+  const [currentLanguage, setCurrentLanguage] = useState(appLanguage || 'en');
+  const isRTL = currentLanguage === 'ar';
 
   const theme = isDarkMode ? darkTheme : lightTheme;
-  const t = (key) => translations[language]?.[key] || translations['en'][key];
+  const t = (key) => translations[currentLanguage]?.[key] || translations['en'][key];
 
   const loadScreenData = useCallback(async () => {
     try {
+      const savedLang = await AsyncStorage.getItem('appLanguage');
+      if (savedLang) {
+        setCurrentLanguage(savedLang);
+      }
+
+      const themeValue = await AsyncStorage.getItem('isDarkMode');
+      setIsDarkMode(themeValue === 'true');
+
       const userJson = await AsyncStorage.getItem('userProfile');
       if (userJson) {
         const parsedData = JSON.parse(userJson);
@@ -48,11 +55,20 @@ const ProfileScreen = ({ appLanguage }) => {
             lastName: parsedData.lastName || parsedData.last_name,
             profileImage: parsedData.profileImage || parsedData.profile_image_url
         });
+      } else {
+         const { data: { user } } = await supabase.auth.getUser();
+         if(user) {
+             const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+             if(data) {
+                 setUserData({
+                     firstName: data.first_name,
+                     lastName: data.last_name,
+                     profileImage: data.profile_image_url
+                 });
+                 await AsyncStorage.setItem('userProfile', JSON.stringify(data));
+             }
+         }
       }
-
-      const themeValue = await AsyncStorage.getItem('isDarkMode');
-      setIsDarkMode(themeValue === 'true');
-      
     } catch (e) {
       console.error("Failed to load data.", e);
     }
@@ -61,7 +77,6 @@ const ProfileScreen = ({ appLanguage }) => {
   useFocusEffect(
     useCallback(() => {
       loadScreenData();
-      return () => {};
     }, [loadScreenData])
   );
 
@@ -138,6 +153,7 @@ const ProfileScreen = ({ appLanguage }) => {
   );
 };
 
+// ✅ التعديلات هنا: تبسيط الستايلات واستخدام marginEnd
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
   header: { height: 200, overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, },
@@ -148,29 +164,28 @@ const styles = {
   menuContainer: { paddingHorizontal: 20, marginTop: 40 },
   menuSection: (theme) => ({ backgroundColor: theme.surface, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }),
   
-  // ✅ التعديل السحري: التحكم في الاتجاه عبر Flexbox
-  settingsItem: (theme, isRTL) => ({ 
-    flexDirection: isRTL ? 'row-reverse' : 'row', 
+  settingsItem: (theme) => ({ 
+    flexDirection: 'row', // ✅ دائماً row، النظام يقلبها
     alignItems: 'center', 
     justifyContent: 'space-between', 
     paddingHorizontal: 15, 
     paddingVertical: 15 
   }),
   
-  settingsItemContent: (isRTL) => ({ 
+  settingsItemContent: { 
     alignItems: 'center', 
     flex: 1, 
-    flexDirection: isRTL ? 'row-reverse' : 'row' 
-  }),
+    flexDirection: 'row' // ✅ دائماً row
+  },
   
-  settingsItemIcon: (isRTL) => ({ 
-    [isRTL ? 'marginLeft' : 'marginRight']: 15 
-  }), 
+  settingsItemIcon: { 
+    marginEnd: 15 // ✅ يعمل تلقائياً في الجهتين
+  }, 
   
-  settingsItemText: (theme, isRTL) => ({ 
+  settingsItemText: (theme) => ({ 
     fontSize: 17, 
     color: theme.primaryText, 
-    textAlign: isRTL ? 'right' : 'left' 
+    textAlign: 'left' // ✅ في العربي يصبح يمين تلقائياً
   }),
   
   separator: (theme) => ({ height: StyleSheet.hairlineWidth, backgroundColor: theme.separator, marginHorizontal: 15 }),

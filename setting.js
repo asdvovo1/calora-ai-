@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView,
   StatusBar, Animated, I18nManager, Platform, Modal, TextInput, Clipboard,
-  ActivityIndicator, DevSettings, NativeModules // ✅ استخدام أدوات النظام المتاحة
+  ActivityIndicator, DevSettings, NativeModules
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +11,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Pedometer } from 'expo-sensors';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GoogleFit, { Scopes } from 'react-native-google-fit';
+import { useFocusEffect } from '@react-navigation/native';
 
 import notificationsData from './notificationsdata'; 
 
@@ -86,10 +87,14 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', text: '#1C1C1E', secondaryText: '#8A8A8E', iconContainer: '#E8F5E9', separator: '#EAEAEA', iconColor: '#1C1C1E', danger: '#D32F2F', statusBar: 'dark-content', primary: '#4CAF50' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', text: '#FFFFFF', secondaryText: '#A5A5A5', iconContainer: '#3A3A3C', separator: '#38383A', iconColor: '#FFFFFF', danger: '#EF5350', statusBar: 'light-content', primary: '#4CAF50' };
 
-const ScreenHeader = ({ title, onBackPress, theme, action }) => (
-    <View style={[styles.headerContainer, { backgroundColor: theme.surface, borderBottomColor: theme.separator }]}>
+const ScreenHeader = ({ title, onBackPress, theme, action, isRTL }) => (
+    <View style={[styles.headerContainer, { 
+        backgroundColor: theme.surface, 
+        borderBottomColor: theme.separator,
+        flexDirection: 'row'
+    }]}>
       <TouchableOpacity onPress={onBackPress} style={styles.headerButton}>
-        <Icon name={I18nManager.isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.text} />
+        <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
       {action ? (
@@ -105,51 +110,99 @@ const ScreenHeader = ({ title, onBackPress, theme, action }) => (
 const formatTime = (date, lang = 'en') => {
     let hours = date.getHours();
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    const ampm_en = hours >= 12 ? 'PM' : 'AM';
-    const ampm_ar = hours >= 12 ? 'م' : 'ص';
-    const ampm = lang === 'ar' ? ampm_ar : ampm_en;
+    const ampm = hours >= 12 ? (lang === 'ar' ? 'م' : 'PM') : (lang === 'ar' ? 'ص' : 'AM');
     hours = hours % 12;
     hours = hours ? hours : 12; 
     return `${hours}:${minutes} ${ampm}`;
 };
 
+// ✅ ده الكود بتاعك القديم بس متصلح
+// أجبرنا الاتجاه يكون LTR عشان الحسابات ما تبوظش في العربي
 const DarkModeToggle = ({ value, onValueChange }) => {
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
-  const isRTL = I18nManager.isRTL;
-  useEffect(() => { Animated.timing(animation, { toValue: value ? 1 : 0, duration: 250, useNativeDriver: false, }).start(); }, [value, animation]);
-  const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'], });
+
+  useEffect(() => { 
+      Animated.timing(animation, { 
+          toValue: value ? 1 : 0, 
+          duration: 250, 
+          useNativeDriver: false, // مهم عشان backgroundColor
+      }).start(); 
+  }, [value, animation]);
+
+  const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   const thumbColor = '#FFFFFF';
-  const translateX = animation.interpolate({ inputRange: [0, 1], outputRange: isRTL ? [-26, 0] : [0, 26] });
+  
+  // ✅ التعديل المهم: الحركة دائماً موجبة لأننا هنجبر الكونتينر يكون LTR
+  // المسافة دي (22) تضمن إن الدائرة تفضل جوه المستطيل
+  const translateX = animation.interpolate({ inputRange: [0, 1], outputRange: [0, -27] });
+
   return (
     <TouchableOpacity onPress={() => onValueChange(!value)} activeOpacity={0.8}>
-      <Animated.View style={[styles.toggleContainer, { backgroundColor: trackColor, direction: 'ltr', alignItems: 'flex-start', padding: 3 }]}>
+      <Animated.View style={[
+          styles.toggleContainer, 
+          { 
+              backgroundColor: trackColor, 
+              direction: 'ltr', // ✅ إجبار الاتجاه شمال ليمين عشان ما يعكسش في العربي
+              alignItems: 'flex-start', // ✅ البداية دائماً من الشمال
+              justifyContent: 'center'
+          }
+      ]}>
         <Animated.View style={[styles.toggleThumb, { backgroundColor: thumbColor, transform: [{ translateX }] }]} />
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
-const SettingsActionItem = ({ icon, label, onPress, color, theme }) => ( 
-    <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { backgroundColor: theme.surface }]}>
-        <View style={styles.itemContent}>
-            <View style={[styles.iconContainer, { backgroundColor: theme.iconContainer }]}>
+const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => ( 
+    <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
+        backgroundColor: theme.surface,
+        flexDirection: 'row'
+    }]}>
+        <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            flex: 1 
+        }}>
+            <View style={[styles.iconContainer, { 
+                backgroundColor: theme.iconContainer,
+                marginEnd: 16 
+            }]}>
                 <Icon name={icon} size={22} color={color || theme.iconColor} />
             </View>
-            <Text style={[styles.label, { color: color || theme.text }]}>{label}</Text>
+            <Text style={[styles.label, { 
+                color: color || theme.text,
+                textAlign: 'left'
+            }]}>{label}</Text>
         </View>
-        <Icon name={I18nManager.isRTL ? "chevron-left" : "chevron-right"} size={24} color="#B0B0B0" />
+        <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={24} color="#B0B0B0" />
     </TouchableOpacity> 
 );
 
-const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress }) => (
-  <View style={[styles.settingsItem, { backgroundColor: theme.surface }]}>
-    <View style={styles.itemContent}>
-      <View style={[styles.iconContainer, { backgroundColor: theme.iconContainer }]}>
+const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress, isRTL }) => (
+  <View style={[styles.settingsItem, { 
+      backgroundColor: theme.surface,
+      flexDirection: 'row'
+  }]}>
+    <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        flex: 1 
+    }}>
+      <View style={[styles.iconContainer, { 
+          backgroundColor: theme.iconContainer,
+          marginEnd: 16
+      }]}>
         <Icon name={icon} size={22} color={theme.iconColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
-        {description && <Text style={[styles.description, { color: theme.secondaryText }]}>{description}</Text>}
+        <Text style={[styles.label, { 
+            color: theme.text,
+            textAlign: 'left'
+        }]}>{label}</Text>
+        {description && <Text style={[styles.description, { 
+            color: theme.secondaryText,
+            textAlign: 'left'
+        }]}>{description}</Text>}
       </View>
     </View>
     {time && value && (
@@ -157,23 +210,47 @@ const SettingsToggleItem = ({ icon, label, description, value, onValueChange, th
         <Text style={[styles.timeText, { color: theme.text }]}>{time}</Text>
       </TouchableOpacity>
     )}
+    
+    {/* ✅ رجعنا المكون بتاعك هنا */}
     <DarkModeToggle value={value} onValueChange={onValueChange} />
   </View>
 );
 
-const LanguageSelectionItem = ({ label, isSelected, onPress, theme }) => ( 
-    <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.label, { color: theme.text, flex: 1 }]}>{label}</Text>
+const LanguageSelectionItem = ({ label, isSelected, onPress, theme, isRTL }) => ( 
+    <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
+        backgroundColor: theme.surface,
+        flexDirection: 'row'
+    }]}>
+        <Text style={[styles.label, { 
+            color: theme.text, 
+            flex: 1,
+            textAlign: 'left'
+        }]}>{label}</Text>
         {isSelected && <Icon name="check-circle" size={24} color="#4CAF50" />}
     </TouchableOpacity> 
 );
 
-const SettingsSectionHeader = ({ title, theme }) => ( <Text style={[styles.sectionHeader, { color: theme.secondaryText }]}>{title}</Text> );
+const SettingsSectionHeader = ({ title, theme, isRTL }) => ( 
+    <Text style={[styles.sectionHeader, { 
+        color: theme.secondaryText,
+        textAlign: 'left'
+    }]}>{title}</Text> 
+);
 
-const SettingsIntegrationItem = ({ icon, label, isConnected, onConnect, onDisconnect, theme, t, isLoading }) => (
-  <View style={[styles.settingsItem, { backgroundColor: theme.surface }]}>
-    <View style={styles.itemContent}>
-      <View style={[styles.iconContainer, { backgroundColor: theme.iconContainer }]}>
+const SettingsIntegrationItem = ({ icon, label, isConnected, onConnect, onDisconnect, theme, t, isLoading, isRTL }) => (
+  <View style={[styles.settingsItem, { 
+      backgroundColor: theme.surface,
+      flexDirection: 'row'
+  }]}>
+    <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        flex: 1 
+    }}>
+      <View style={[styles.iconContainer, { 
+          backgroundColor: theme.iconContainer,
+          marginEnd: 16
+      }]}>
         <Icon name={icon} size={22} color={theme.iconColor} />
       </View>
       <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
@@ -198,8 +275,8 @@ const SettingsIntegrationItem = ({ icon, label, isConnected, onConnect, onDiscon
 const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentView, setCurrentView] = useState('main');
-  const [activeLanguage, setActiveLanguage] = useState(appLanguage);
-  const [selectedLanguage, setSelectedLanguage] = useState(appLanguage);
+  const [activeLanguage, setActiveLanguage] = useState(appLanguage || 'en');
+  const [selectedLanguage, setSelectedLanguage] = useState(appLanguage || 'en');
   const [exportDataContent, setExportDataContent] = useState('');
   const defaultReminderSettings = { breakfast: { enabled: false, time: '08:00' }, lunch: { enabled: false, time: '13:00' }, dinner: { enabled: false, time: '19:00' }, snacks: { enabled: false, time: '16:00' }, water: { enabled: false }, weighIn: { enabled: false, time: '07:30', day: 6 }, workout: { enabled: false, time: '17:00' }, stepsGoal: { enabled: false }, };
   const [reminders, setReminders] = useState(defaultReminderSettings);
@@ -209,6 +286,7 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   
+  const isRTL = activeLanguage === 'ar';
   const theme = isDarkMode ? darkTheme : lightTheme;
   const t = (key, lang = activeLanguage) => translations[lang]?.[key] || translations['en'][key];
 
@@ -221,33 +299,44 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
     return formatTime(date, lang);
   };
 
-  useEffect(() => {
-    const loadSettings = async () => {
-      const savedTheme = await AsyncStorage.getItem('isDarkMode');
-      setIsDarkMode(savedTheme === 'true');
-      const isConnected = await AsyncStorage.getItem('isGoogleFitConnected') === 'true';
-      setIsGoogleFitConnected(isConnected);
-      const savedRemindersRaw = await AsyncStorage.getItem('reminderSettings');
-      if (savedRemindersRaw) {
-        try {
-          const savedReminders = JSON.parse(savedRemindersRaw);
-          const mergedReminders = { ...defaultReminderSettings };
-          for (const key in mergedReminders) {
-            if (savedReminders[key]) {
-              mergedReminders[key] = { ...mergedReminders[key], ...savedReminders[key] };
+  useFocusEffect(
+    useCallback(() => {
+        const loadSettings = async () => {
+            const savedTheme = await AsyncStorage.getItem('isDarkMode');
+            setIsDarkMode(savedTheme === 'true');
+            const isConnected = await AsyncStorage.getItem('isGoogleFitConnected') === 'true';
+            setIsGoogleFitConnected(isConnected);
+            
+            const savedLang = await AsyncStorage.getItem('appLanguage');
+            if (savedLang) {
+                setActiveLanguage(savedLang);
+                setSelectedLanguage(savedLang);
+            } else if (appLanguage) {
+                setActiveLanguage(appLanguage);
+                setSelectedLanguage(appLanguage);
             }
-          }
-          setReminders(mergedReminders);
-        } catch (e) {
-          console.error("Failed to parse reminder settings:", e);
-          setReminders(defaultReminderSettings);
-        }
-      } else {
-        setReminders(defaultReminderSettings);
-      }
-    };
-    loadSettings();
-  }, []);
+
+            const savedRemindersRaw = await AsyncStorage.getItem('reminderSettings');
+            if (savedRemindersRaw) {
+                try {
+                    const savedReminders = JSON.parse(savedRemindersRaw);
+                    const mergedReminders = { ...defaultReminderSettings };
+                    for (const key in mergedReminders) {
+                        if (savedReminders[key]) {
+                            mergedReminders[key] = { ...mergedReminders[key], ...savedReminders[key] };
+                        }
+                    }
+                    setReminders(mergedReminders);
+                } catch (e) {
+                    setReminders(defaultReminderSettings);
+                }
+            } else {
+                setReminders(defaultReminderSettings);
+            }
+        };
+        loadSettings();
+    }, [appLanguage])
+  );
 
   const scheduleAllNotifications = async (currentSettings, currentLang) => {
     if (Platform.OS === 'web') return;
@@ -384,13 +473,14 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const handleDisconnectGoogleFit = async () => { try { await GoogleFit.disconnect(); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert("Google Fit", t('disconnectSuccess')); } catch (error) { console.error("DISCONNECT_ERROR", error); } };
 
-  // ✅ الدالة المعدلة بدون expo-updates
   const handleSaveLanguage = async () => {
     if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
     try {
       await AsyncStorage.setItem('appLanguage', selectedLanguage);
       const isAr = selectedLanguage === 'ar';
       
+      setActiveLanguage(selectedLanguage);
+
       I18nManager.allowRTL(isAr);
       I18nManager.forceRTL(isAr);
       
@@ -402,8 +492,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
                 text: 'OK', 
                 onPress: async () => { 
                     try {
-                        // محاولة إعادة التشغيل باستخدام DevSettings (تعمل في Expo Go)
-                        // في الإنتاج، لن تفعل شيئاً وسيحتاج المستخدم لإغلاق التطبيق
                         if (DevSettings && DevSettings.reload) {
                             DevSettings.reload();
                         } else if (NativeModules.DevSettings && NativeModules.DevSettings.reload) {
@@ -424,35 +512,35 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
     if (currentView === 'notifications') {
       return (
         <>
-            <SettingsSectionHeader title={t('mealReminders')} theme={theme} />
-            <SettingsToggleItem icon="food-croissant" label={t('breakfast')} value={reminders.breakfast.enabled} onValueChange={() => handleToggleReminder('breakfast')} time={displayTime(reminders.breakfast.time, activeLanguage)} onTimePress={() => showTimePicker('breakfast')} theme={theme} />
-            <SettingsToggleItem icon="food-turkey" label={t('lunch')} value={reminders.lunch.enabled} onValueChange={() => handleToggleReminder('lunch')} time={displayTime(reminders.lunch.time, activeLanguage)} onTimePress={() => showTimePicker('lunch')} theme={theme} />
-            <SettingsToggleItem icon="food-steak" label={t('dinner')} value={reminders.dinner.enabled} onValueChange={() => handleToggleReminder('dinner')} time={displayTime(reminders.dinner.time, activeLanguage)} onTimePress={() => showTimePicker('dinner')} theme={theme} />
-            <SettingsToggleItem icon="food-apple-outline" label={t('snacks')} value={reminders.snacks.enabled} onValueChange={() => handleToggleReminder('snacks')} time={displayTime(reminders.snacks.time, activeLanguage)} onTimePress={() => showTimePicker('snacks')} theme={theme} />
-            <SettingsSectionHeader title={t('generalReminders')} theme={theme} />
-            <SettingsToggleItem icon="cup-water" label={t('waterReminder')} value={reminders.water.enabled} onValueChange={() => handleToggleReminder('water')} theme={theme} />
-            <SettingsToggleItem icon="scale-bathroom" label={t('weighInReminder')} value={reminders.weighIn.enabled} onValueChange={() => handleToggleReminder('weighIn')} time={displayTime(reminders.weighIn.time, activeLanguage)} onTimePress={() => showTimePicker('weighIn')} theme={theme} />
-            <SettingsToggleItem icon="dumbbell" label={t('workoutReminder')} value={reminders.workout.enabled} onValueChange={() => handleToggleReminder('workout')} time={displayTime(reminders.workout.time, activeLanguage)} onTimePress={() => showTimePicker('workout')} theme={theme} />
-            <SettingsToggleItem icon="walk" label={t('stepsGoalReminder')} description={t('stepsGoalReminderDesc')} value={reminders.stepsGoal.enabled} onValueChange={() => handleToggleReminder('stepsGoal')} theme={theme} />
+            <SettingsSectionHeader title={t('mealReminders')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="food-croissant" label={t('breakfast')} value={reminders.breakfast.enabled} onValueChange={() => handleToggleReminder('breakfast')} time={displayTime(reminders.breakfast.time, activeLanguage)} onTimePress={() => showTimePicker('breakfast')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="food-turkey" label={t('lunch')} value={reminders.lunch.enabled} onValueChange={() => handleToggleReminder('lunch')} time={displayTime(reminders.lunch.time, activeLanguage)} onTimePress={() => showTimePicker('lunch')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="food-steak" label={t('dinner')} value={reminders.dinner.enabled} onValueChange={() => handleToggleReminder('dinner')} time={displayTime(reminders.dinner.time, activeLanguage)} onTimePress={() => showTimePicker('dinner')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="food-apple-outline" label={t('snacks')} value={reminders.snacks.enabled} onValueChange={() => handleToggleReminder('snacks')} time={displayTime(reminders.snacks.time, activeLanguage)} onTimePress={() => showTimePicker('snacks')} theme={theme} isRTL={isRTL} />
+            <SettingsSectionHeader title={t('generalReminders')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="cup-water" label={t('waterReminder')} value={reminders.water.enabled} onValueChange={() => handleToggleReminder('water')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="scale-bathroom" label={t('weighInReminder')} value={reminders.weighIn.enabled} onValueChange={() => handleToggleReminder('weighIn')} time={displayTime(reminders.weighIn.time, activeLanguage)} onTimePress={() => showTimePicker('weighIn')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="dumbbell" label={t('workoutReminder')} value={reminders.workout.enabled} onValueChange={() => handleToggleReminder('workout')} time={displayTime(reminders.workout.time, activeLanguage)} onTimePress={() => showTimePicker('workout')} theme={theme} isRTL={isRTL} />
+            <SettingsToggleItem icon="walk" label={t('stepsGoalReminder')} description={t('stepsGoalReminderDesc')} value={reminders.stepsGoal.enabled} onValueChange={() => handleToggleReminder('stepsGoal')} theme={theme} isRTL={isRTL} />
         </>
       );
     }
     if (currentView === 'language') { 
-        return ( <View style={{ paddingTop: 20 }}><LanguageSelectionItem label="English" isSelected={selectedLanguage === 'en'} onPress={() => setSelectedLanguage('en')} theme={theme} /><LanguageSelectionItem label="العربية" isSelected={selectedLanguage === 'ar'} onPress={() => setSelectedLanguage('ar')} theme={theme} /></View> );
+        return ( <View style={{ paddingTop: 20 }}><LanguageSelectionItem label="English" isSelected={selectedLanguage === 'en'} onPress={() => setSelectedLanguage('en')} theme={theme} isRTL={isRTL} /><LanguageSelectionItem label="العربية" isSelected={selectedLanguage === 'ar'} onPress={() => setSelectedLanguage('ar')} theme={theme} isRTL={isRTL} /></View> );
     }
     if (currentView === 'export') { 
-        return ( <View style={{paddingHorizontal: 16, paddingTop: 20}}><Text style={[styles.exportDescription, { color: theme.secondaryText }]}>{t('exportDataDescription')}</Text><TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.iconColor }]} onPress={handlePrepareExportData}><Icon name="database-arrow-down-outline" size={22} color={theme.background} style={ { marginEnd: 12 } } /><Text style={[styles.exportButtonText, { color: theme.background }]}>{t('exportAllData')}</Text></TouchableOpacity>{exportDataContent ? ( <View><TextInput style={[styles.dataBox, { color: theme.text, borderColor: theme.separator, backgroundColor: theme.surface }]} value={exportDataContent} multiline={true} editable={false} /><TouchableOpacity style={[styles.exportButton, { backgroundColor: '#4CAF50', marginTop: 10 }]} onPress={copyToClipboard}><Icon name="content-copy" size={22} color={'#FFFFFF'} style={{ marginEnd: 12 }} /><Text style={[styles.exportButtonText, { color: '#FFFFFF' }]}>{t('copyToClipboard')}</Text></TouchableOpacity></View> ) : null}</View> );
+        return ( <View style={{paddingHorizontal: 16, paddingTop: 20}}><Text style={[styles.exportDescription, { color: theme.secondaryText, textAlign: 'left' }]}>{t('exportDataDescription')}</Text><TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.iconColor }]} onPress={handlePrepareExportData}><Icon name="database-arrow-down-outline" size={22} color={theme.background} style={ { marginEnd: 12 } } /><Text style={[styles.exportButtonText, { color: theme.background }]}>{t('exportAllData')}</Text></TouchableOpacity>{exportDataContent ? ( <View><TextInput style={[styles.dataBox, { color: theme.text, borderColor: theme.separator, backgroundColor: theme.surface, textAlign: 'left' }]} value={exportDataContent} multiline={true} editable={false} /><TouchableOpacity style={[styles.exportButton, { backgroundColor: '#4CAF50', marginTop: 10 }]} onPress={copyToClipboard}><Icon name="content-copy" size={22} color={'#FFFFFF'} style={{ marginEnd: 12 }} /><Text style={[styles.exportButtonText, { color: '#FFFFFF' }]}>{t('copyToClipboard')}</Text></TouchableOpacity></View> ) : null}</View> );
     }
     return (
         <>
-            <SettingsToggleItem icon="theme-light-dark" label={t('darkMode')} value={isDarkMode} onValueChange={handleToggleDarkMode} theme={theme} />
-            <SettingsActionItem icon="bell-outline" label={t('notifications')} onPress={() => setCurrentView('notifications')} theme={theme} />
-            <SettingsActionItem icon="translate" label={t('language')} onPress={() => setCurrentView('language')} theme={theme} />
-            <SettingsSectionHeader title={t('connectedApps')} theme={theme} />
-            <SettingsIntegrationItem icon="google-fit" label={t('googleFit')} isConnected={isGoogleFitConnected} onConnect={handleConnectGoogleFit} onDisconnect={handleDisconnectGoogleFit} theme={theme} t={t} isLoading={isConnecting} />
+            <SettingsToggleItem icon="theme-light-dark" label={t('darkMode')} value={isDarkMode} onValueChange={handleToggleDarkMode} theme={theme} isRTL={isRTL} />
+            <SettingsActionItem icon="bell-outline" label={t('notifications')} onPress={() => setCurrentView('notifications')} theme={theme} isRTL={isRTL} />
+            <SettingsActionItem icon="translate" label={t('language')} onPress={() => setCurrentView('language')} theme={theme} isRTL={isRTL} />
+            <SettingsSectionHeader title={t('connectedApps')} theme={theme} isRTL={isRTL} />
+            <SettingsIntegrationItem icon="google-fit" label={t('googleFit')} isConnected={isGoogleFitConnected} onConnect={handleConnectGoogleFit} onDisconnect={handleDisconnectGoogleFit} theme={theme} t={t} isLoading={isConnecting} isRTL={isRTL} />
             <View style={{ height: 20 }} />
-            <SettingsActionItem icon="export-variant" label={t('exportData')} onPress={() => setCurrentView('export')} theme={theme} />
-            <SettingsActionItem icon="account-remove-outline" label={t('deleteAccount')} onPress={handleDeleteAccount} color={theme.danger} theme={theme} />
+            <SettingsActionItem icon="export-variant" label={t('exportData')} onPress={() => setCurrentView('export')} theme={theme} isRTL={isRTL} />
+            <SettingsActionItem icon="account-remove-outline" label={t('deleteAccount')} onPress={handleDeleteAccount} color={theme.danger} theme={theme} isRTL={isRTL} />
         </>
     );
   };
@@ -462,7 +550,7 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.surface }]}>
       <StatusBar barStyle={theme.statusBar} backgroundColor={theme.surface} />
-      <ScreenHeader title={getHeaderTitle()} onBackPress={handleBackPress} theme={theme} action={headerAction} />
+      <ScreenHeader title={getHeaderTitle()} onBackPress={handleBackPress} theme={theme} action={headerAction} isRTL={isRTL} />
       <ScrollView style={{backgroundColor: theme.background}} contentContainerStyle={[ styles.scrollContent, { paddingTop: currentView === 'main' ? 20 : 0 } ]}>
         {renderContent()}
       </ScrollView>
@@ -480,23 +568,32 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerContainer: { height: 60, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row' },
+  headerContainer: { height: 60, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   headerTitle: { fontSize: 20, fontWeight: 'bold' },
   headerButton: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
   headerActionText: { fontSize: 16, fontWeight: '600', },
   scrollContent: { paddingBottom: 20 },
-  settingsItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, padding: 12, marginHorizontal: 16, marginBottom: 10, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
-  itemContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginEnd: 16 },
-  label: { fontSize: 16, textAlign: 'left' },
-  description: { fontSize: 12, paddingTop: 2, textAlign: 'left' },
-  sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 28, paddingVertical: 10, marginTop: 10, textAlign: 'left' },
+  
+  settingsItem: { alignItems: 'center', justifyContent: 'space-between', borderRadius: 10, padding: 12, marginHorizontal: 16, marginBottom: 10, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  
+  iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  
+  label: { fontSize: 16 },
+  description: { fontSize: 12, paddingTop: 2 },
+  
+  sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 28, paddingVertical: 10, marginTop: 10 },
+  
+  // ✅ ستايلات الزرار المخصص رجعت تاني
   toggleContainer: { width: 52, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center', alignItems: 'flex-start' },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
-  exportDescription: { fontSize: 15, lineHeight: 22, marginBottom: 24, paddingHorizontal: 12, textAlign: 'left' },
+  
+  exportDescription: { fontSize: 15, lineHeight: 22, marginBottom: 24, paddingHorizontal: 12 },
+  
   exportButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 15, borderRadius: 12, marginHorizontal: 16, },
   exportButtonText: { fontSize: 16, fontWeight: 'bold', },
-  dataBox: { marginTop: 20, padding: 10, height: 200, borderWidth: 1, borderRadius: 8, textAlignVertical: 'top', fontSize: 12, textAlign: 'left' },
+  
+  dataBox: { marginTop: 20, padding: 10, height: 200, borderWidth: 1, borderRadius: 8, textAlignVertical: 'top', fontSize: 12 },
+  
   timeText: { fontSize: 16, fontWeight: '600', marginHorizontal: 10, },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalContent: { borderTopRightRadius: 20, borderTopLeftRadius: 20, padding: 20, position: 'absolute', bottom: 0, width: '100%' },

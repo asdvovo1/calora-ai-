@@ -56,21 +56,13 @@ const translations = {
     }
 };
 
-// ✅ استقبال appLanguage
 const AboutScreen = ({ route }) => { 
-    // إذا لم يتم تمرير اللغة عبر props (لأنها شاشة في stack)، نحاول جلبها من route params أو استخدام 'en' كافتراضي
     const initialLang = route?.params?.appLanguage || 'en';
-
     const [theme, setTheme] = useState(lightTheme);
-    
-    // ✅✅ التعديل الأهم: استخدام 'en' كقيمة افتراضية
     const [language, setLanguage] = useState(initialLang); 
-    
     const navigation = useNavigation();
-
     const t = (key) => translations[language]?.[key] || key;
     
-    // ✅ تحديد الاتجاه يدوياً بناءً على اللغة
     const isRTL = language === 'ar';
     
     useFocusEffect(
@@ -103,10 +95,9 @@ const AboutScreen = ({ route }) => {
         <SafeAreaView style={styles.rootContainer(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
             
-            {/* Header اليدوي */}
-            <View style={styles.customHeader(theme, isRTL)}>
+            <View style={styles.customHeader(theme)}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    {/* السهم ينقلب يدوياً */}
+                    {/* ✅ السهم يتغير شكله، لكن مكانه سيتحدد تلقائياً بالـ styles */}
                     <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.textPrimary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle(theme)}>{t('headerTitle')}</Text>
@@ -120,29 +111,29 @@ const AboutScreen = ({ route }) => {
                 </View>
 
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme, isRTL)}>{t('aboutUsTitle')}</Text>
-                    <Text style={styles.sectionText(theme, isRTL)}>{t('aboutUsText')}</Text>
+                    <Text style={styles.sectionTitle(theme)}>{t('aboutUsTitle')}</Text>
+                    <Text style={styles.sectionText(theme)}>{t('aboutUsText')}</Text>
                 </View>
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme, isRTL)}>{t('featuresTitle')}</Text>
+                    <Text style={styles.sectionTitle(theme)}>{t('featuresTitle')}</Text>
                     {features.map((feature, index) => (
-                        <View key={index} style={styles.featureItem(isRTL)}>
-                            <Icon name={feature.icon} size={35} color={theme.primary} style={styles.featureIcon(isRTL)} />
-                            <View style={styles.featureTextContainer(isRTL)}>
-                                <Text style={styles.featureTitle(theme, isRTL)}>{feature.title}</Text>
-                                <Text style={styles.featureDescription(theme, isRTL)}>{feature.description}</Text>
+                        <View key={index} style={styles.featureItem}>
+                            <Icon name={feature.icon} size={35} color={theme.primary} style={styles.featureIcon} />
+                            <View style={styles.featureTextContainer}>
+                                <Text style={styles.featureTitle(theme)}>{feature.title}</Text>
+                                <Text style={styles.featureDescription(theme)}>{feature.description}</Text>
                             </View>
                         </View>
                     ))}
                 </View>
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme, isRTL)}>{t('visionTitle')}</Text>
-                    <Text style={styles.sectionText(theme, isRTL)}>{t('visionText')}</Text>
+                    <Text style={styles.sectionTitle(theme)}>{t('visionTitle')}</Text>
+                    <Text style={styles.sectionText(theme)}>{t('visionText')}</Text>
                 </View>
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme, isRTL)}>{t('contactTitle')}</Text>
-                    <Text style={styles.sectionText(theme, isRTL)}>{t('contactIntro')}</Text>
-                    <TouchableOpacity style={styles.contactItem(theme, isRTL)} onPress={handleEmailPress}>
+                    <Text style={styles.sectionTitle(theme)}>{t('contactTitle')}</Text>
+                    <Text style={styles.sectionText(theme)}>{t('contactIntro')}</Text>
+                    <TouchableOpacity style={styles.contactItem(theme)} onPress={handleEmailPress}>
                         <Icon name="email-outline" size={24} color={theme.primary} />
                         <Text style={styles.contactText(theme)}>{contactEmail}</Text>
                     </TouchableOpacity>
@@ -153,13 +144,12 @@ const AboutScreen = ({ route }) => {
     );
 };
 
+// ✅ Styles مصححة (إزالة row-reverse و flex-end اليدوي)
 const styles = {
     rootContainer: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     container: { paddingHorizontal: 20, paddingBottom: 40 },
-    
-    // ✅ التحكم اليدوي في Header
-    customHeader: (theme, isRTL) => ({
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+    customHeader: (theme) => ({
+        flexDirection: 'row', // ✅
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 15,
@@ -174,18 +164,40 @@ const styles = {
     slogan: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginTop: 4 }),
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 12, padding: 20, marginBottom: 20, elevation: 3 }),
     
-    // ✅ التحكم اليدوي في المحاذاة
-    sectionTitle: (theme, isRTL) => ({ fontSize: 22, fontWeight: 'bold', color: theme.primary, marginBottom: 15, textAlign: isRTL ? 'right' : 'left' }),
-    sectionText: (theme, isRTL) => ({ fontSize: 16, lineHeight: 24, color: theme.textSecondary, textAlign: isRTL ? 'right' : 'left' }),
+    sectionTitle: (theme) => ({ 
+        fontSize: 22, fontWeight: 'bold', color: theme.primary, marginBottom: 15, 
+        textAlign: 'left' // ✅
+    }),
+    sectionText: (theme) => ({ 
+        fontSize: 16, lineHeight: 24, color: theme.textSecondary, 
+        textAlign: 'left' // ✅
+    }),
     
-    // ✅ التحكم اليدوي في القوائم
-    featureItem: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start', marginBottom: 20 }),
-    featureIcon: (isRTL) => ({ [isRTL ? 'marginLeft' : 'marginRight']: 15 }),
-    featureTextContainer: (isRTL) => ({ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }), // إجبار النص على المحاذاة
-    featureTitle: (theme, isRTL) => ({ fontSize: 17, fontWeight: 'bold', color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left' }),
-    featureDescription: (theme, isRTL) => ({ fontSize: 14, color: theme.textSecondary, marginTop: 4, lineHeight: 20, textAlign: isRTL ? 'right' : 'left' }),
+    featureItem: { 
+        flexDirection: 'row', // ✅
+        alignItems: 'flex-start', marginBottom: 20 
+    },
+    featureIcon: { 
+        marginRight: 15 // ✅ تصبح marginLeft في العربي تلقائياً
+    },
+    featureTextContainer: { 
+        flex: 1, 
+        alignItems: 'flex-start' // ✅
+    },
+    featureTitle: (theme) => ({ 
+        fontSize: 17, fontWeight: 'bold', color: theme.textPrimary, 
+        textAlign: 'left' // ✅
+    }),
+    featureDescription: (theme) => ({ 
+        fontSize: 14, color: theme.textSecondary, marginTop: 4, lineHeight: 20, 
+        textAlign: 'left' // ✅
+    }),
     
-    contactItem: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 20, backgroundColor: theme.contactBg, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, alignSelf: isRTL ? 'flex-end' : 'flex-start' }),
+    contactItem: (theme) => ({ 
+        flexDirection: 'row', // ✅
+        alignItems: 'center', marginTop: 20, backgroundColor: theme.contactBg, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, 
+        alignSelf: 'flex-start' // ✅
+    }),
     contactText: (theme) => ({ fontSize: 16, color: theme.contactText, fontWeight: '500', marginHorizontal: 10 }),
     footerText: (theme) => ({ textAlign: 'center', color: theme.textSecondary, marginTop: 20, fontSize: 12 }),
 };
