@@ -25,8 +25,11 @@ const GoalPromptModal = ({ visible, onClose, onSubmit, theme, t }) => { const [i
 
 const StepsScreen = () => {
     const [theme, setTheme] = useState(lightTheme);
-    const [language, setLanguage] = useState('ar');
-    const [isRTL, setIsRTL] = useState(true);
+    
+    // ✅ التعديل 1: الافتراضي 'en'
+    const [language, setLanguage] = useState('en');
+    const [isRTL, setIsRTL] = useState(false);
+    
     const [currentStepCount, setCurrentStepCount] = useState(0);
     const [stepsGoal, setStepsGoal] = useState(10000);
     const [historicalData, setHistoricalData] = useState([]);
@@ -74,9 +77,12 @@ const StepsScreen = () => {
                 try {
                     const savedTheme = await AsyncStorage.getItem('isDarkMode');
                     if (isMounted) setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
+                    
+                    // ✅ التعديل 2: تحميل اللغة
                     const savedLang = await AsyncStorage.getItem('appLanguage');
-                    const currentLang = savedLang || 'ar';
+                    const currentLang = savedLang || 'en';
                     if (isMounted) { setLanguage(currentLang); setIsRTL(currentLang === 'ar'); }
+                    
                     const savedGoal = await AsyncStorage.getItem('stepsGoal');
                     if (isMounted && savedGoal) setStepsGoal(parseInt(savedGoal, 10));
 
@@ -104,18 +110,15 @@ const StepsScreen = () => {
                         try {
                             const dayResult = await Pedometer.getStepCountAsync(dayStart, dayEnd);
                             
-                            // ✅ ===== التعديل الأول: تغيير نوع النص الذي يظهر تحت الأعمدة ===== ✅
                             let dayLabel = '';
                             if (selectedPeriod === 'week') {
-                                // في عرض الأسبوع: استخدم اسم اليوم المختصر (مثل: ح, ن, ث)
                                 dayLabel = dayStart.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' });
                             } else {
-                                // في عرض الشهر: استخدم رقم اليوم (مثل: 15, 20, 25)
                                 dayLabel = dayStart.getDate().toString();
                             }
 
                             historicalSteps.push({ 
-                                day: dayLabel, // استخدام النص الجديد
+                                day: dayLabel, 
                                 steps: dayResult ? dayResult.steps : 0 
                             });
                         } catch (e) {
@@ -211,8 +214,6 @@ const StepsScreen = () => {
                         {historicalData.map((day, index) => ( 
                             <View key={index} style={styles.barWrapper}>
                                 <View style={[styles.bar(theme), {height: `${(day.steps / maxChartSteps) * 100}%`}]} />
-                                
-                                {/* ✅ ===== التعديل الثاني: عرض النص بشكل مشروط لتجنب الازدحام ===== ✅ */}
                                 {(selectedPeriod === 'week' || (index + 1) % 5 === 0) && (
                                     <Text style={styles.barLabel(theme)}>{day.day}</Text>
                                 )}
@@ -235,24 +236,35 @@ const StepsScreen = () => {
 };
 
 const styles = {
-    // ... كل الستايلات القديمة تبقى كما هي
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
+    
+    // ✅ محاذاة النص يدوياً
     sectionTitle: (theme, isRTL) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left', marginBottom: 4, marginTop: 15 }),
+    
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
     progressCircleText: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.textPrimary }),
     summaryTextContainer: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
+    
+    // ✅ اتجاه العناصر الفرعية يدوياً
     subStatsContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 }),
+    
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    chartContainer: (isRTL) => ({ flexDirection: isRTL ? 'row' : 'row-reverse', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20 }),
+    
+    // ✅ اتجاه الشارت يدوياً
+    chartContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20 }),
+    
     barWrapper: { flex: 1, alignItems: 'center', marginHorizontal: 2 },
     bar: (theme) => ({ width: '80%', backgroundColor: theme.primary, borderRadius: 5 }),
     barLabel: (theme) => ({ marginTop: 5, fontSize: 10, color: theme.textSecondary }),
+    
+    // ✅ اتجاه الإحصائيات يدوياً
     statsRow: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background }),
+    
     statLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary }),
     statValue: (theme) => ({ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }),
     modalOverlay: (theme) => ({ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center' }),
@@ -266,7 +278,10 @@ const styles = {
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    periodToggleContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row' : 'row-reverse', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10 }),
+    
+    // ✅ اتجاه التبديل يدوياً
+    periodToggleContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10 }),
+    
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),

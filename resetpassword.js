@@ -1,5 +1,3 @@
-// File: resetpassword.js (الكود الكامل والنهائي)
-
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
@@ -27,19 +25,20 @@ const HeaderComponent = ({ theme, isRTL, navigation, title }) => (
             <Path d={`M0,0 L${width},0 L${width},${height * 0.12} Q${width / 2},${height * 0.18} 0,${height * 0.12} Z`} fill="url(#grad-reset)" />
         </Svg>
         <View style={styles.headerContent}>
+            {/* 👇 التعديل هنا: استخدام arrow-left دائماً وتدويره إذا لزم الأمر، أو تركه ثابتاً */}
             <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-                <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+                {/* تم تغيير arrow-right إلى arrow-left ليظهر سهم الرجوع بشكل صحيح */}
+                <Icon name="arrow-left" size={24} color={theme.headerText} style={isRTL ? { transform: [{ rotate: '180deg' }] } : {}} /> 
+                {/* ملاحظة: إذا كنت تفضل أن يشير السهم لليسار دائماً حتى في العربي (الشكل الشائع)، احذف الـ style اللي فيه transform */}
             </TouchableOpacity>
             <Text style={styles.headerTitle(theme)}>{title}</Text>
         </View>
     </View>
 );
 
-// 🔧 --- التعديل هنا: استقبال appLanguage --- 🔧
 const ResetPasswordScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
 
-    // ✅ نستخدم اللغة القادمة من App.js مباشرة
     const language = appLanguage || 'en';
     const isRTL = language === 'ar';
 
@@ -51,7 +50,6 @@ const ResetPasswordScreen = ({ navigation, appLanguage }) => {
     
     const t = (key) => translations[language]?.[key] || key;
 
-    // 🔧 --- التعديل هنا: هذا الـ Hook الآن فقط للـ Theme --- 🔧
     useFocusEffect(
         useCallback(() => {
             const loadTheme = async () => {
@@ -123,6 +121,8 @@ const styles = {
     safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     headerContainer: { height: height * 0.22 },
     headerContent: { marginTop: (StatusBar.currentHeight || 40) + 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 60 },
+    // 👇 التعديل في الستايل: إذا كنت تريد زر الرجوع دائماً على اليسار (مثل الصورة) قم بإزالة الشرط
+    // إذا كنت تريده على اليمين في العربي، اترك الشرط كما هو:
     backButton: (isRTL) => ({ padding: 10, position: 'absolute', [isRTL ? 'right' : 'left']: 15, zIndex: 1 }),
     headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.headerText, textAlign: 'center', flex: 1 }),
     formContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 30, paddingBottom: 20 },

@@ -1,9 +1,8 @@
-// setting.js - إصلاح نهائي لزر التبديل (داخل الحدود)
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView,
   StatusBar, Animated, I18nManager, Platform, Modal, TextInput, Clipboard,
-  DevSettings, ActivityIndicator
+  ActivityIndicator, DevSettings, NativeModules // ✅ استخدام أدوات النظام المتاحة
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,13 +11,8 @@ import * as TaskManager from 'expo-task-manager';
 import { Pedometer } from 'expo-sensors';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GoogleFit, { Scopes } from 'react-native-google-fit';
+
 import notificationsData from './notificationsdata'; 
-
-const STEPS_NOTIFICATION_TASK = 'steps-notification-task';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false }),
-});
 
 const translations = {
   en: {
@@ -29,7 +23,7 @@ const translations = {
     workoutReminder: 'Workout Reminder',
     stepsGoalReminder: 'Steps Goal Reminder',
     stepsGoalReminderDesc: 'Get a notification when you reach your daily step goal.',
-    save: 'Save', languageSaved: 'Language Saved', languageSettingsUpdated: 'Language settings updated. The app will now reload.',
+    save: 'Save', languageSaved: 'Language Saved', languageSettingsUpdated: 'Language settings updated. Please restart the app to apply changes.',
     deleteAccountTitle: 'Delete Account Permanently', deleteAccountMessage: 'Are you sure? This action cannot be undone...',
     cancel: 'Cancel', delete: 'Delete',
     exportDataDescription: 'Your entire food log is prepared below as CSV text...',
@@ -62,7 +56,7 @@ const translations = {
     workoutReminder: 'تذكير التمرين',
     stepsGoalReminder: 'تذكير هدف الخطوات',
     stepsGoalReminderDesc: 'احصل على إشعار عند وصولك لهدفك اليومي من الخطوات.',
-    save: 'حفظ', languageSaved: 'تم حفظ اللغة', languageSettingsUpdated: 'تم تحديث إعدادات اللغة. سيتم الآن إعادة تحميل التطبيق.',
+    save: 'حفظ', languageSaved: 'تم حفظ اللغة', languageSettingsUpdated: 'تم تحديث إعدادات اللغة. يرجى إعادة تشغيل التطبيق لتطبيق التغييرات.',
     deleteAccountTitle: 'حذف الحساب نهائياً', deleteAccountMessage: 'هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء...',
     cancel: 'إلغاء', delete: 'حذف',
     exportDataDescription: 'تم تجهيز كامل سجل طعامك في الأسفل كنص CSV...',
@@ -119,43 +113,16 @@ const formatTime = (date, lang = 'en') => {
     return `${hours}:${minutes} ${ampm}`;
 };
 
-// ✅✅✅ التعديل الحاسم: حسابات دقيقة مع إجبار الاتجاه ✅✅✅
 const DarkModeToggle = ({ value, onValueChange }) => {
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
-  // هنا بنجيب اتجاه اللغة عشان نعكس الأرقام
   const isRTL = I18nManager.isRTL;
-  
-  useEffect(() => {
-    Animated.timing(animation, { toValue: value ? 1 : 0, duration: 250, useNativeDriver: false, }).start();
-  }, [value, animation]);
-
+  useEffect(() => { Animated.timing(animation, { toValue: value ? 1 : 0, duration: 250, useNativeDriver: false, }).start(); }, [value, animation]);
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'], });
   const thumbColor = '#FFFFFF';
-  
-  // الحسبة: العرض الكلي (52) - عرض الدائرة (20) - بادينج يسار (3) - بادينج يمين (3) = مسافة الحركة 26
-  // بنستخدم isRTL عشان نعكس:
-  // عربي: (0=OFF) يروح يمين 26، (1=ON) يرجع شمال 0
-  const translateX = animation.interpolate({ 
-      inputRange: [0, 1], 
-      outputRange: isRTL ? [-26, 0] : [0, 26] 
-  });
-  
+  const translateX = animation.interpolate({ inputRange: [0, 1], outputRange: isRTL ? [-26, 0] : [0, 26] });
   return (
     <TouchableOpacity onPress={() => onValueChange(!value)} activeOpacity={0.8}>
-      {/* 
-        هام جداً: direction: 'ltr' يجبر الزر يبدأ من الشمال.
-        alignItems: 'flex-start' يضع الدائرة في بداية اليسار.
-        padding: 3 يضمن إن الدائرة متخرجش بره حدود "البوردر"
-      */}
-      <Animated.View style={[
-          styles.toggleContainer, 
-          { 
-            backgroundColor: trackColor, 
-            direction: 'ltr', // هذا هو السطر السحري (بيثبت الإحداثيات)
-            alignItems: 'flex-start', // بداية من اليسار دائماً
-            padding: 3 // مسافة داخلية للدائرة
-          }
-      ]}>
+      <Animated.View style={[styles.toggleContainer, { backgroundColor: trackColor, direction: 'ltr', alignItems: 'flex-start', padding: 3 }]}>
         <Animated.View style={[styles.toggleThumb, { backgroundColor: thumbColor, transform: [{ translateX }] }]} />
       </Animated.View>
     </TouchableOpacity>
@@ -336,11 +303,11 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
             await AsyncStorage.setItem('reminderSettings', JSON.stringify(revertedState));
             return;
         }
-        await TaskManager.registerTaskAsync(STEPS_NOTIFICATION_TASK, { minimumInterval: 15 * 60 });
+        await TaskManager.registerTaskAsync('steps-notification-task', { minimumInterval: 15 * 60 });
         Alert.alert(t('remindersSaved'));
     } else {
         if (TaskManager && typeof TaskManager.unregisterTaskAsync === 'function') {
-            await TaskManager.unregisterTaskAsync(STEPS_NOTIFICATION_TASK);
+            await TaskManager.unregisterTaskAsync('steps-notification-task');
         }
         Alert.alert(t('remindersSaved'));
     }
@@ -389,35 +356,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
     setIsDarkMode(value);
     if (onThemeChange) { onThemeChange(value); } else { AsyncStorage.setItem('isDarkMode', String(value)).catch(e => console.error(e)); }
   };
-
-  const handleSaveLanguage = async () => {
-    if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
-    try {
-      await AsyncStorage.setItem('appLanguage', selectedLanguage);
-      
-      const isAr = selectedLanguage === 'ar';
-      I18nManager.allowRTL(isAr);
-      I18nManager.forceRTL(isAr);
-      
-      Alert.alert(
-        t('languageSaved', selectedLanguage), 
-        t('languageSettingsUpdated', selectedLanguage), 
-        [ 
-            { 
-                text: 'OK', 
-                onPress: () => { 
-                    try {
-                        DevSettings.reload(); 
-                    } catch(e) {
-                    }
-                }, 
-            }, 
-        ], 
-        { cancelable: false }
-      );
-    } catch (e) { console.error("Failed to save language settings.", e); Alert.alert("Error", "Could not save language settings."); }
-  };
-
   const handleBackPress = () => { if (currentView === 'language') { setSelectedLanguage(activeLanguage); setCurrentView('main'); return; } if (currentView !== 'main') { setCurrentView('main'); setExportDataContent(''); } else if(navigation.canGoBack()) { navigation.goBack(); } };
   const handlePrepareExportData = async () => {
       try {
@@ -435,40 +373,51 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const copyToClipboard = () => { if (exportDataContent) { Clipboard.setString(exportDataContent); Alert.alert(t('copied')); } };
   const handleDeleteAccount = () => { Alert.alert(t('deleteAccountTitle'), t('deleteAccountMessage'), [{ text: t('cancel'), style: 'cancel' }, { text: t('delete'), style: 'destructive', onPress: () => console.log("Account deleted") }]); };
-  
   const handleConnectGoogleFit = async () => {
     setIsConnecting(true);
     const options = { scopes: [ Scopes.FITNESS_ACTIVITY_READ, Scopes.FITNESS_BODY_READ, Scopes.FITNESS_NUTRITION_READ, ], };
     try {
         const authResult = await GoogleFit.authorize(options);
-        if (authResult.success) {
-            setIsGoogleFitConnected(true);
-            await AsyncStorage.setItem('isGoogleFitConnected', 'true');
-            Alert.alert('Google Fit', t('connectionSuccess'));
-        } else {
-            console.log("AUTH_DENIED", authResult.message);
-            setIsGoogleFitConnected(false);
-            await AsyncStorage.setItem('isGoogleFitConnected', 'false');
-            Alert.alert('Google Fit', t('connectionFailed'));
-        }
-    } catch (error) {
-        console.error("AUTH_ERROR", error);
-        setIsGoogleFitConnected(false);
-        await AsyncStorage.setItem('isGoogleFitConnected', 'false');
-        Alert.alert('Google Fit', t('connectionFailed'));
-    } finally {
-        setIsConnecting(false);
-    }
+        if (authResult.success) { setIsGoogleFitConnected(true); await AsyncStorage.setItem('isGoogleFitConnected', 'true'); Alert.alert('Google Fit', t('connectionSuccess'));
+        } else { console.log("AUTH_DENIED", authResult.message); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert('Google Fit', t('connectionFailed')); }
+    } catch (error) { console.error("AUTH_ERROR", error); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert('Google Fit', t('connectionFailed')); } finally { setIsConnecting(false); }
   };
-  const handleDisconnectGoogleFit = async () => {
+  const handleDisconnectGoogleFit = async () => { try { await GoogleFit.disconnect(); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert("Google Fit", t('disconnectSuccess')); } catch (error) { console.error("DISCONNECT_ERROR", error); } };
+
+  // ✅ الدالة المعدلة بدون expo-updates
+  const handleSaveLanguage = async () => {
+    if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
     try {
-        await GoogleFit.disconnect();
-        setIsGoogleFitConnected(false);
-        await AsyncStorage.setItem('isGoogleFitConnected', 'false');
-        Alert.alert("Google Fit", t('disconnectSuccess'));
-    } catch (error) {
-        console.error("DISCONNECT_ERROR", error);
-    }
+      await AsyncStorage.setItem('appLanguage', selectedLanguage);
+      const isAr = selectedLanguage === 'ar';
+      
+      I18nManager.allowRTL(isAr);
+      I18nManager.forceRTL(isAr);
+      
+      Alert.alert(
+        t('languageSaved', selectedLanguage), 
+        t('languageSettingsUpdated', selectedLanguage), 
+        [ 
+            { 
+                text: 'OK', 
+                onPress: async () => { 
+                    try {
+                        // محاولة إعادة التشغيل باستخدام DevSettings (تعمل في Expo Go)
+                        // في الإنتاج، لن تفعل شيئاً وسيحتاج المستخدم لإغلاق التطبيق
+                        if (DevSettings && DevSettings.reload) {
+                            DevSettings.reload();
+                        } else if (NativeModules.DevSettings && NativeModules.DevSettings.reload) {
+                            NativeModules.DevSettings.reload();
+                        }
+                    } catch(e) {
+                       console.log("Manual restart required");
+                    }
+                }, 
+            }, 
+        ], 
+        { cancelable: false }
+      );
+    } catch (e) { console.error("Failed to save language settings.", e); Alert.alert("Error", "Could not save language settings."); }
   };
 
   const renderContent = () => {
@@ -529,7 +478,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   );
 };
 
-// ✅ Styles: تمت إزالة padding من التوجل وإضافة justifyContent و alignItems
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerContainer: { height: 60, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row' },

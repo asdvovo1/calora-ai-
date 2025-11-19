@@ -1,6 +1,5 @@
-// editprofile.js - الكود الكامل والمصحح
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, Platform, Keyboard, ActivityIndicator, I18nManager } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, Platform, Keyboard, ActivityIndicator } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
@@ -23,25 +22,24 @@ const darkTheme = { background: '#121212', surface: '#1E1E1E', textDark: '#FFFFF
 
 const calculateCalories = (userData) => { if (!userData || !userData.birthDate || !userData.weight || !userData.height || !userData.gender || !userData.activityLevel || !userData.goal) return 2000; const { birthDate, gender, weight, height, activityLevel, goal } = userData; const age = new Date().getFullYear() - new Date(birthDate).getFullYear(); let bmr = (gender === 'male') ? (10 * weight + 6.25 * height - 5 * age + 5) : (10 * weight + 6.25 * height - 5 * age - 161); const activityMultipliers = { sedentary: 1.2, light: 1.375, active: 1.55, very_active: 1.725 }; const tdee = bmr * (activityMultipliers[activityLevel] || 1.2); let finalCalories; switch (goal) { case 'lose': finalCalories = tdee - 500; break; case 'gain': finalCalories = tdee + 500; break; default: finalCalories = tdee; break; } return Math.max(1200, Math.round(finalCalories)); };
 
-// ✅ تم التعديل: إزالة الشروط اليدوية واستخدام Flexbox الطبيعي
-const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme }) => { 
+// مكونات الإدخال والاختيار (لم تتغير، تعتمد على isRTL)
+const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme, isRTL }) => { 
   return ( 
-    <View style={styles.inputContainer(theme)}>
+    <View style={styles.inputContainer(theme, isRTL)}>
         <View style={{flex: 1}}>
-            <Text style={styles.inputLabel(theme)}>{label}</Text>
-            <TextInput style={styles.textInput(theme)} value={value} onChangeText={onChangeText} keyboardType={keyboardType} placeholderTextColor={theme.textGray} />
+            <Text style={styles.inputLabel(theme, isRTL)}>{label}</Text>
+            <TextInput style={styles.textInput(theme, isRTL)} value={value} onChangeText={onChangeText} keyboardType={keyboardType} placeholderTextColor={theme.textGray} />
         </View>
         {value && String(value).trim().length > 0 && <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />}
     </View> 
   ); 
 });
 
-// ✅ تم التعديل: إزالة الشروط اليدوية
-const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme }) => { 
+const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme, isRTL }) => { 
   return ( 
     <View style={styles.optionContainer}>
-        <Text style={styles.inputLabel(theme)}>{label}</Text>
-        <View style={styles.optionsWrapper}>
+        <Text style={styles.inputLabel(theme, isRTL)}>{label}</Text>
+        <View style={styles.optionsWrapper(isRTL)}>
             {options.map((option) => ( 
                 <TouchableOpacity key={option.value} style={[styles.optionButton(theme), selectedValue === option.value && styles.optionButtonSelected(theme)]} onPress={() => onSelect(option.value)}>
                     <Text style={[styles.optionText(theme), selectedValue === option.value && styles.optionTextSelected]} numberOfLines={1} adjustsFontSizeToFit>{option.label}</Text>
@@ -52,7 +50,8 @@ const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, th
   ); 
 });
 
-const EditProfileScreen = () => {
+// ✅ استقبال appLanguage هنا
+const EditProfileScreen = ({ appLanguage }) => {
   const navigation = useNavigation();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -69,10 +68,15 @@ const EditProfileScreen = () => {
   const [keyboardPadding, setKeyboardPadding] = useState(50);
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeLanguage, setActiveLanguage] = useState('ar');
   
+  // ✅✅ التعديل الأهم: التهيئة بناءً على اللغة الممررة أو الإنجليزية
+  const [activeLanguage, setActiveLanguage] = useState(appLanguage || 'en');
+  
+  // ✅ تعريف متغير isRTL
+  const isRTL = activeLanguage === 'ar';
+
   const theme = isDarkMode ? darkTheme : lightTheme;
-  const t = (key) => translations[activeLanguage][key] || translations['en'][key];
+  const t = (key) => translations[activeLanguage]?.[key] || translations['en'][key];
 
   useFocusEffect(
     useCallback(() => {
@@ -81,7 +85,14 @@ const EditProfileScreen = () => {
         try {
           const savedLang = await AsyncStorage.getItem('appLanguage');
           const savedTheme = await AsyncStorage.getItem('isDarkMode');
-          if (savedLang) setActiveLanguage(savedLang);
+          
+          // ✅ تحديث اللغة إذا كانت محفوظة، وإلا استخدام الممررة
+          if (savedLang) {
+            setActiveLanguage(savedLang);
+          } else if (appLanguage) {
+            setActiveLanguage(appLanguage);
+          }
+
           setIsDarkMode(savedTheme === 'true');
 
           const { data: { user } } = await supabase.auth.getUser();
@@ -113,13 +124,13 @@ const EditProfileScreen = () => {
           }
         } catch(e) {
           console.error("Failed to load profile data", e);
-          Alert.alert(t('error'), e.message);
+          // Alert.alert(t('error'), e.message); // يمكن إخفاء الخطأ لعدم إزعاج المستخدم
         } finally {
           setIsLoading(false);
         }
       };
       loadSettingsAndData();
-    }, [])
+    }, [appLanguage]) // إضافة appLanguage للتبعية
   );
 
   useEffect(() => {
@@ -174,10 +185,9 @@ const EditProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container(theme)}>
-      {/* ✅ Header المصحح: Flexbox عادي + سهم يعتمد على I18nManager */}
-      <View style={styles.header(theme)}>
+      <View style={styles.header(theme, isRTL)}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-            <Icon name={I18nManager.isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.icon} />
+            <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.icon} />
         </TouchableOpacity>
         <Text style={styles.headerTitle(theme)}>{t('editProfile')}</Text>
         <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
@@ -189,76 +199,71 @@ const EditProfileScreen = () => {
         <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
                 <Image source={profileImage ? { uri: profileImage } : require('./assets/profile.png')} style={styles.profileImage(theme)}/>
-                {/* زر الكاميرا يستخدم end:0 ليكون في المكان الصحيح في اللغتين */}
-                <TouchableOpacity style={styles.cameraButton(theme)} onPress={handleImagePicker}>
+                <TouchableOpacity style={styles.cameraButton(theme, isRTL)} onPress={handleImagePicker}>
                     <Ionicons name="camera" size={18} color={theme.textDark} />
                 </TouchableOpacity>
             </View>
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('publicInfo')}</Text>
-            <InfoInput label={t('firstName')} value={firstName} onChangeText={setFirstName} theme={theme} />
-            <InfoInput label={t('lastName')} value={lastName} onChangeText={setLastName} theme={theme} />
-            <View style={[styles.inputContainer(theme), styles.disabledInputContainer(theme)]}>
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('publicInfo')}</Text>
+            <InfoInput label={t('firstName')} value={firstName} onChangeText={setFirstName} theme={theme} isRTL={isRTL} />
+            <InfoInput label={t('lastName')} value={lastName} onChangeText={setLastName} theme={theme} isRTL={isRTL} />
+            <View style={[styles.inputContainer(theme, isRTL), styles.disabledInputContainer(theme)]}>
                 <View style={{flex: 1}}>
-                    <Text style={styles.inputLabel(theme)}>{t('mail')}</Text>
-                    <TextInput style={[styles.textInput(theme), styles.disabledTextInput(theme)]} value={email} editable={false} />
+                    <Text style={styles.inputLabel(theme, isRTL)}>{t('mail')}</Text>
+                    <TextInput style={[styles.textInput(theme, isRTL), styles.disabledTextInput(theme)]} value={email} editable={false} />
                 </View>
                 <Ionicons name="lock-closed-outline" size={22} color={theme.textGray} />
             </View>
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('physicalMetrics')}</Text>
-            <OptionSelector label={t('gender')} options={[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }]} selectedValue={gender} onSelect={setGender} theme={theme} />
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('physicalMetrics')}</Text>
+            <OptionSelector label={t('gender')} options={[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }]} selectedValue={gender} onSelect={setGender} theme={theme} isRTL={isRTL} />
             
-            <TouchableOpacity style={styles.inputContainer(theme)} onPress={() => setShowDatePicker(true)}>
+            <TouchableOpacity style={styles.inputContainer(theme, isRTL)} onPress={() => setShowDatePicker(true)}>
                 <View style={{flex: 1}}>
-                    <Text style={styles.inputLabel(theme)}>{t('dob')}</Text>
-                    <Text style={styles.textInput(theme)}>{birthDate.toLocaleDateString(activeLanguage === 'ar' ? 'ar-EG' : 'en-GB')}</Text>
+                    <Text style={styles.inputLabel(theme, isRTL)}>{t('dob')}</Text>
+                    <Text style={styles.textInput(theme, isRTL)}>{birthDate.toLocaleDateString(activeLanguage === 'ar' ? 'ar-EG' : 'en-GB')}</Text>
                 </View>
                 <Ionicons name="calendar-outline" size={22} color={theme.textGray} />
             </TouchableOpacity>
             {showDatePicker && <DateTimePicker value={birthDate} mode="date" display="spinner" onChange={onDateChange} locale={activeLanguage} />}
             
-            <InfoInput label={t('height')} value={height} onChangeText={setHeight} keyboardType="numeric" theme={theme} />
-            <InfoInput label={t('currentWeight')} value={weight} onChangeText={setWeight} keyboardType="numeric" theme={theme} />
+            <InfoInput label={t('height')} value={height} onChangeText={setHeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />
+            <InfoInput label={t('currentWeight')} value={weight} onChangeText={setWeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('goals')}</Text>
-            <OptionSelector label={t('mainGoal')} options={[{ label: t('lose'), value: 'lose' }, { label: t('maintain'), value: 'maintain' }, { label: t('gain'), value: 'gain' }]} selectedValue={goal} onSelect={setGoal} theme={theme} />
-            {goal !== 'maintain' && <InfoInput label={t('targetWeight')} value={targetWeight} onChangeText={setTargetWeight} keyboardType="numeric" theme={theme} />}
-            <OptionSelector label={t('activityLevel')} options={[{ label: t('sedentary'), value: 'sedentary' }, { label: t('light'), value: 'light' }, { label: t('active'), value: 'active' }, { label: t('very_active'), value: 'very_active' }]} selectedValue={activityLevel} onSelect={setActivityLevel} theme={theme} />
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('goals')}</Text>
+            <OptionSelector label={t('mainGoal')} options={[{ label: t('lose'), value: 'lose' }, { label: t('maintain'), value: 'maintain' }, { label: t('gain'), value: 'gain' }]} selectedValue={goal} onSelect={setGoal} theme={theme} isRTL={isRTL} />
+            {goal !== 'maintain' && <InfoInput label={t('targetWeight')} value={targetWeight} onChangeText={setTargetWeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />}
+            <OptionSelector label={t('activityLevel')} options={[{ label: t('sedentary'), value: 'sedentary' }, { label: t('light'), value: 'light' }, { label: t('active'), value: 'active' }, { label: t('very_active'), value: 'very_active' }]} selectedValue={activityLevel} onSelect={setActivityLevel} theme={theme} isRTL={isRTL} />
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-// ✅ Styles محسنة تدعم RTL تلقائياً بدون شروط معقدة
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }), 
-  // flexDirection: 'row' سيقلب لليمين تلقائياً
-  header: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }), 
+  header: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }), 
   headerButton: { padding: 5, width: 40, alignItems: 'center' },
   headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.textDark }), 
   profileSection: { alignItems: 'center', marginVertical: 20 }, 
   profileImageContainer: { position: 'relative' }, 
   profileImage: (theme) => ({ width: 100, height: 100, borderRadius: 50, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }), 
-  // استخدام end: 0 و bottom: 0 للمكان الصحيح
-  cameraButton: (theme) => ({ position: 'absolute', bottom: 0, end: 0, backgroundColor: theme.surface, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.border, elevation: 3 }), 
+  cameraButton: (theme, isRTL) => ({ position: 'absolute', bottom: 0, [isRTL ? 'left' : 'right']: 0, backgroundColor: theme.surface, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.border, elevation: 3 }), 
   formSection: { paddingHorizontal: 20, marginBottom: 10, paddingTop: 10 }, 
-  // textAlign: 'left' تعني بداية السطر (يمين في العربي)
-  sectionTitle: (theme) => ({ fontSize: 13, color: theme.textGray, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', textAlign: 'left' }), 
-  inputContainer: (theme) => ({ backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.border }), 
-  inputLabel: (theme) => ({ fontSize: 12, color: theme.textGray, marginBottom: 4, textAlign: 'left' }), 
-  textInput: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textDark, padding: 0, textAlign: 'left' }), 
+  sectionTitle: (theme, isRTL) => ({ fontSize: 13, color: theme.textGray, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', textAlign: isRTL ? 'right' : 'left' }), 
+  inputContainer: (theme, isRTL) => ({ backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 15, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.border }), 
+  inputLabel: (theme, isRTL) => ({ fontSize: 12, color: theme.textGray, marginBottom: 4, textAlign: isRTL ? 'right' : 'left' }), 
+  textInput: (theme, isRTL) => ({ fontSize: 16, fontWeight: '600', color: theme.textDark, padding: 0, textAlign: isRTL ? 'right' : 'left' }), 
   disabledInputContainer: (theme) => ({ backgroundColor: theme.disabledBackground }), 
   disabledTextInput: (theme) => ({ color: theme.textGray }), 
   optionContainer: { marginBottom: 15 }, 
-  optionsWrapper: { flexDirection: 'row', gap: 8 }, 
+  optionsWrapper: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }), 
   optionButton: (theme) => ({ flex: 1, paddingVertical: 12, paddingHorizontal: 5, borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface }),
   optionButtonSelected: (theme) => ({ backgroundColor: theme.primary, borderColor: theme.primary }), 
   optionText: (theme) => ({ color: theme.textDark, fontWeight: '600', fontSize: 14 }), 

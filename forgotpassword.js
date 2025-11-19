@@ -1,5 +1,3 @@
-// forgotpassword.js (الكود الكامل والنهائي)
-
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TextInput,
@@ -12,6 +10,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// تضمين Supabase
 import { supabase } from './supabaseclient';
 
 const { width, height } = Dimensions.get('window');
@@ -30,7 +29,8 @@ const HeaderComponent = ({ theme, isRTL, navigation, title }) => {
         </Svg>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-            <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+             {/* ✅ السهم ثابت لليسار */}
+            <Icon name="arrow-left" size={24} color={theme.headerText} />
           </TouchableOpacity>
           <Text style={styles.headerTitle(theme)}>{title}</Text>
         </View>
@@ -38,11 +38,8 @@ const HeaderComponent = ({ theme, isRTL, navigation, title }) => {
     );
 };
 
-// 🔧 --- التعديل هنا: استقبال appLanguage --- 🔧
 const ForgotPasswordScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
-    
-    // ✅ نستخدم اللغة القادمة من App.js مباشرة
     const language = appLanguage || 'en';
     const isRTL = language === 'ar';
 
@@ -51,7 +48,6 @@ const ForgotPasswordScreen = ({ navigation, appLanguage }) => {
 
     const t = (key) => translations[language]?.[key] || key;
 
-    // 🔧 --- التعديل هنا: هذا الـ Hook الآن فقط للـ Theme --- 🔧
     useFocusEffect(
         useCallback(() => {
             const loadTheme = async () => {
@@ -66,6 +62,7 @@ const ForgotPasswordScreen = ({ navigation, appLanguage }) => {
 
     const validateEmail = (emailToValidate) => /\S+@\S+\.\S+/.test(emailToValidate);
 
+    // 🔥 دالة استعادة كلمة المرور عبر Supabase
     const handleRecover = async () => {
         if (!validateEmail(email)) {
             Alert.alert(t('alertTitle'), t('alertMessage'));
@@ -73,9 +70,11 @@ const ForgotPasswordScreen = ({ navigation, appLanguage }) => {
         }
         setLoading(true);
         try {
-            // Note: Supabase sends a link, not a code for password reset.
-            // The user clicks the link, which should deep link back into your app to the ResetPassword screen.
-            const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase());
+            // ✅ Supabase Logic: إرسال رابط إعادة التعيين
+            const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), {
+                // يمكنك هنا إضافة redirectTo إذا كان لديك Deep Link، وإلا سيستخدم الإعدادات الافتراضية في لوحة تحكم Supabase
+            });
+            
             if (error) {
                 Alert.alert(t('alertTitle'), error.message);
             } else {

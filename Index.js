@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Image, Dimensions,
-  TouchableOpacity, StatusBar, SafeAreaView, Animated, I18nManager,
+  TouchableOpacity, StatusBar, SafeAreaView, Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
 
 // ==========================================================
-// ===== الثيمات والترجمات (بدون تغيير) =====
+// ===== الثيمات والترجمات =====
 // ==========================================================
 const lightTheme = {
     background: '#F6FEF6', primary: '#4CAF50', text: '#333333',
@@ -54,8 +54,6 @@ const IndexScreen = ({ navigation, route, appLanguage }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const slidesRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
-
-    // ✅ الخطوة 1: نضيف state جديد لتتبع حالة الـ layout
     const [isListReady, setIsListReady] = useState(false);
 
     const t = (key) => translations[language]?.[key] || key;
@@ -72,38 +70,31 @@ const IndexScreen = ({ navigation, route, appLanguage }) => {
         loadTheme();
     }, []);
     
-    // ✅ الخطوة 2: تعديل useFocusEffect ليعيد تعيين الحالة فقط عند التركيز على الشاشة
     useFocusEffect(
         useCallback(() => {
-            // نعيد تعيين كل شيء عند العودة لهذه الشاشة
-            scrollX.setValue(0);
+            // إعادة تعيين المؤشر عند العودة للشاشة
             setCurrentIndex(0);
-            setIsListReady(false); // مهم جداً: نعيد تعيين حالة الجاهزية
-        }, [])
+            scrollX.setValue(0);
+            // ملاحظة: لا داعي لإعادة تعيين isListReady هنا لتجنب الوميض، 
+            // ولكن يجب التأكد من العودة للصفحة الأولى
+            if (slidesRef.current && isListReady) {
+                slidesRef.current.scrollToIndex({ index: 0, animated: false });
+            }
+        }, [isListReady])
     );
 
-    // ✅ الخطوة 3: نستخدم useEffect جديد لينتظر حتى تصبح القائمة جاهزة ثم يقوم بالتمرير
-    useEffect(() => {
-        // هذا الكود لن يعمل إلا بعد أن يتم استدعاء onLayout وتصبح isListReady = true
-        if (isListReady && slidesRef.current) {
-            slidesRef.current.scrollToIndex({ index: 0, animated: false });
-        }
-    }, [isListReady]); // نراقب التغيير في حالة جاهزية القائمة
-
     const onViewableItemsChanged = useRef(({ viewableItems }) => {
-        if (viewableItems.length > 0) {
+        if (viewableItems && viewableItems.length > 0) {
             setCurrentIndex(viewableItems[0].index);
         }
     }).current;
+
     const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
     
     const handleNextPress = () => {
         const nextSlideIndex = currentIndex + 1;
         if (nextSlideIndex < slidesContent.length && slidesRef.current) {
-            // التأخير هنا لا يزال مفيدًا لتجنب أي مشاكل عند الضغط السريع
-            setTimeout(() => {
-                slidesRef.current?.scrollToIndex({ index: nextSlideIndex });
-            }, 50); 
+            slidesRef.current.scrollToIndex({ index: nextSlideIndex, animated: true });
         }
     };
     
@@ -140,20 +131,33 @@ const IndexScreen = ({ navigation, route, appLanguage }) => {
                         [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                         { useNativeDriver: false }
                     )}
-                    // ✅ الخطوة 4: نضيف onLayout إلى FlatList لتحديث الحالة عند اكتمال الرسم
                     onLayout={() => setIsListReady(true)}
+                    // ✅ الـ inverted يقوم بقلب اتجاه المحتوى تلقائياً
                     inverted={isRTL} 
                 />
             </View>
 
             <View style={styles.bottomContainer(theme, isRTL)}>
                 <View>
+                    {/* ✅ تم تعديل منطق النقاط هنا */}
                     <View style={styles.paginatorContainer(isRTL)}>
                         {slides.map((_, i) => {
-                            const itemIndex = isRTL ? slides.length - 1 - i : i;
-                            const inputRange = [(itemIndex - 1) * width, itemIndex * width, (itemIndex + 1) * width];
-                            const dotWidth = scrollX.interpolate({ inputRange, outputRange: [8, 25, 8], extrapolate: 'clamp' });
-                            const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+                            // 🔧 التصحيح: نستخدم i مباشرة بدون عمليات حسابية معقدة
+                            // لأن الـ FlatList المقلوب (inverted) يجعل العنصر الأول عند الإزاحة 0
+                            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+                            
+                            const dotWidth = scrollX.interpolate({
+                                inputRange,
+                                outputRange: [8, 25, 8],
+                                extrapolate: 'clamp'
+                            });
+                            
+                            const opacity = scrollX.interpolate({
+                                inputRange,
+                                outputRange: [0.3, 1, 0.3],
+                                extrapolate: 'clamp'
+                            });
+
                             return <Animated.View key={i.toString()} style={[styles.dot(theme), { width: dotWidth, opacity }]} />;
                         })}
                     </View>
@@ -187,7 +191,6 @@ const IndexScreen = ({ navigation, route, appLanguage }) => {
     );
 };
 
-// ... الأنماط (styles) تبقى كما هي بدون أي تغيير
 const styles = {
     container: (theme) => ({ flex: 1, backgroundColor: theme.background, }),
     topContainer: (theme) => ({ height: height * 0.52, backgroundColor: theme.background, borderBottomLeftRadius: 80, borderBottomRightRadius: 80, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 8, overflow: 'hidden', }),
@@ -196,6 +199,7 @@ const styles = {
     bottomContainer: (theme, isRTL) => ({ flex: 1, paddingHorizontal: 30, paddingTop: 30, paddingBottom: 15, backgroundColor: theme.background, justifyContent: 'space-between',  }),
     title: (theme, isRTL) => ({ fontSize: 28, fontWeight: 'bold', color: theme.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 12, }),
     description: (theme, isRTL) => ({ fontSize: 13, color: theme.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 20, opacity: 0.7, }),
+    // ✅ هذا الستايل مهم جداً: هو الذي يرتب النقاط من اليمين لليسار بصرياً
     paginatorContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-start', marginBottom: 25, }),
     dot: (theme) => ({ height: 8, borderRadius: 4, marginHorizontal: 4, backgroundColor: theme.primary, }),
     button: (theme) => ({ backgroundColor: theme.white, borderRadius: 50, paddingVertical: 18, width: '100%', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, }),

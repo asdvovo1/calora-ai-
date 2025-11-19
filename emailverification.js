@@ -1,17 +1,12 @@
-// File: emailverification.js (الكود الكامل والنهائي)
-
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, TextInput,
-  TouchableOpacity, StatusBar, Dimensions, Image, Animated, Alert, ActivityIndicator,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
+  View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, Dimensions, Image, KeyboardAvoidingView, ScrollView, Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// تضمين Supabase للمحافظة على النسق
 import { supabase } from './supabaseclient';
 
 const { width, height } = Dimensions.get('window');
@@ -28,24 +23,21 @@ const HeaderComponent = ({ theme, isRTL, navigation, title }) => (
         </Svg>
         <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
-                <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.headerText} />
+                {/* ✅ السهم ثابت لليسار */}
+                <Icon name="arrow-left" size={24} color={theme.headerText} />
             </TouchableOpacity>
             <Text style={styles.headerTitle(theme)}>{title}</Text>
         </View>
     </View>
 );
 
-// 🔧 --- التعديل هنا: استقبال appLanguage --- 🔧
 const EmailVerificationScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
-    
-    // ✅ نستخدم اللغة القادمة من App.js مباشرة
     const language = appLanguage || 'en';
     const isRTL = language === 'ar';
     
     const t = (key) => translations[language]?.[key] || key;
     
-    // 🔧 --- التعديل هنا: هذا الـ Hook الآن فقط للـ Theme --- 🔧
     useFocusEffect(
         useCallback(() => {
             const loadTheme = async () => {

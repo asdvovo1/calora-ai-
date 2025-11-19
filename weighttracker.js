@@ -9,10 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LineChart } from 'react-native-chart-kit';
 import GoogleFit from 'react-native-google-fit';
-import { supabase } from './supabaseclient'; // <-- استيراد Supabase
+import { supabase } from './supabaseclient'; 
 
 const screenWidth = Dimensions.get('window').width;
-const HISTORY_KEY_LOCAL = 'weightHistory'; // <-- تغيير اسم المفتاح المحلي
+const HISTORY_KEY_LOCAL = 'weightHistory'; 
 const lightTheme = { primary: '#388E3C', background: '#E8F5E9', card: '#FFFFFF', textPrimary: '#212121', textSecondary: '#757575', inputBackground: '#F5F5F5', overlay: 'rgba(0,0,0,0.5)', statusBar: 'dark-content', chartLine: (opacity = 1) => `rgba(56, 142, 60, ${opacity})`, chartLabel: (opacity = 1) => `rgba(33, 33, 33, ${opacity})`, tooltipBg: '#212121', tooltipText: '#FFFFFF', white: '#FFFFFF', red: '#F44336' };
 const darkTheme = { primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF', textSecondary: '#B0B0B0', inputBackground: '#2C2C2C', overlay: 'rgba(0,0,0,0.7)', statusBar: 'light-content', chartLine: (opacity = 1) => `rgba(102, 187, 106, ${opacity})`, chartLabel: (opacity = 1) => `rgba(224, 224, 224, ${opacity})`, tooltipBg: '#E0E0E0', tooltipText: '#121212', white: '#FFFFFF', red: '#EF9A9A' };
 const translations = { ar: { weightProgress: 'تطور الوزن', chartEmpty: 'أضف وزنين على الأقل لرؤية الرسم البياني.', statistics: 'إحصائيات', startWeight: 'وزن البداية', currentWeight: 'الوزن الحالي', totalChange: 'التغير الكلي', history: 'السجل التاريخي', historyEmpty: 'لم تقم بتسجيل وزنك بعد.', addWeightTitle: 'إضافة وزن جديد', weightInputPlaceholder: 'أدخل وزنك بالكيلوجرام', cancel: 'إلغاء', save: 'حفظ', errorTitle: 'خطأ', invalidWeight: 'الرجاء إدخال وزن صحيح.', kgUnit: ' كجم' }, en: { weightProgress: 'Weight Progress', chartEmpty: 'Add at least two weights to see the chart.', statistics: 'Statistics', startWeight: 'Start Weight', currentWeight: 'Current Weight', totalChange: 'Total Change', history: 'History Log', historyEmpty: 'You have not logged your weight yet.', addWeightTitle: 'Add New Weight', weightInputPlaceholder: 'Enter your weight in kg', cancel: 'Cancel', save: 'Save', errorTitle: 'Error', invalidWeight: 'Please enter a valid weight.', kgUnit: ' kg' } };
@@ -30,8 +30,11 @@ const WeightChartComponent = ({ data, theme, selectedPoint, onPointClick, t }) =
 
 const WeightScreen = () => {
     const [theme, setTheme] = useState(lightTheme);
-    const [language, setLanguage] = useState('ar');
-    const [isRTL, setIsRTL] = useState(true);
+    
+    // ✅ التعديل 1: القيمة الافتراضية 'en'
+    const [language, setLanguage] = useState('en');
+    const [isRTL, setIsRTL] = useState(false);
+
     const [history, setHistory] = useState([]);
     const [isModalVisible, setModalVisible] = useState(false);
     const [newWeight, setNewWeight] = useState('');
@@ -51,7 +54,6 @@ const WeightScreen = () => {
 
     const t = (key) => translations[language]?.[key] || translations['en'][key];
     
-    // ✅ ===== دالة تحميل البيانات (معدلة بالكامل) ===== ✅
     const loadHistory = useCallback(async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -70,7 +72,7 @@ const WeightScreen = () => {
             setHistory(formattedHistory);
             return formattedHistory;
         } catch (e) {
-            console.error('Failed to load weight history from Supabase, falling back to local.', e);
+            console.error('Failed to load weight history', e);
             const jsonValue = await AsyncStorage.getItem(HISTORY_KEY_LOCAL);
             const localData = jsonValue != null ? JSON.parse(jsonValue) : [];
             localData.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -87,14 +89,14 @@ const WeightScreen = () => {
             
             const savedTheme = await AsyncStorage.getItem('isDarkMode');
             setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
+            
+            // ✅ التعديل 2: تحميل اللغة وتعيين الاتجاه
             const savedLang = await AsyncStorage.getItem('appLanguage');
-            const currentLang = savedLang || 'ar';
+            const currentLang = savedLang || 'en';
             setLanguage(currentLang);
             setIsRTL(currentLang === 'ar');
             
             let historyData = await loadHistory();
-            
-            // ... (Google Fit sync can remain as is)
             
             const newChartData = historyData.length > 0 ? { labels: historyData.map(item => new Date(item.date).toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' })).slice(-7), datasets: [{ data: historyData.map(item => item.weight).slice(-7), strokeWidth: 3 }] } : { labels: [], datasets: [{ data: [] }] };
             setDisplayChartData(newChartData);
@@ -103,7 +105,6 @@ const WeightScreen = () => {
         loadAndPrepareData();
     }, [loadHistory]));
     
-    // ✅ ===== دالة حفظ البيانات (معدلة بالكامل) ===== ✅
     const handleSaveWeight = async () => {
         const weightValue = parseFloat(newWeight.replace(',', '.'));
         if (isNaN(weightValue) || weightValue <= 0) {
@@ -115,7 +116,6 @@ const WeightScreen = () => {
         const newEntry = { date: today.toISOString(), weight: weightValue };
         let updatedHistory;
 
-        // تحديث الواجهة فوراً
         const todayDateString = today.toISOString().split('T')[0];
         const existingEntryIndex = history.findIndex(item => new Date(item.date).toISOString().split('T')[0] === todayDateString);
         if (existingEntryIndex > -1) {
@@ -128,41 +128,26 @@ const WeightScreen = () => {
         setHistory(updatedHistory);
         
         try {
-            // الحفظ المحلي
             await AsyncStorage.setItem(HISTORY_KEY_LOCAL, JSON.stringify(updatedHistory));
-            
-            // الحفظ في Supabase
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            // نستخدم upsert لضمان عدم تكرار الوزن في نفس اليوم
             const { error } = await supabase
                 .from('weight_history')
                 .upsert({ 
                     user_id: user.id, 
                     entry_date: today.toISOString(), 
                     weight: weightValue
-                }, { 
-                    onConflict: 'user_id, entry_date' // لم ننشئ قيدًا فريدًا، لذا سنحتاج إلى منطق مختلف قليلاً
-                    // نظرًا لعدم وجود قيد فريد، سنقوم بالحذف ثم الإدراج إذا كان الإدخال موجودًا بالفعل
-                });
+                }, { onConflict: 'user_id, entry_date' });
             
-            // For simplicity, we'll just insert. A more robust solution might check for an existing entry for the day first.
-            const { error: insertError } = await supabase.from('weight_history').insert({
-                user_id: user.id,
-                entry_date: newEntry.date,
-                weight: newEntry.weight
-            });
-
-
-            if (insertError) throw insertError;
+            if (error && error.code === '23505') { // conflict fallback
+                 await supabase.from('weight_history').insert({ user_id: user.id, entry_date: newEntry.date, weight: newEntry.weight });
+            }
 
             setNewWeight('');
             setModalVisible(false);
         } catch (e) {
             console.error('Failed to save weight.', e);
-            Alert.alert(t('errorTitle'), e.message);
-            // لو فشل الحفظ في Supabase، ارجع الحالة للشكل القديم
             loadHistory(); 
         }
     };
@@ -195,7 +180,9 @@ const WeightScreen = () => {
                 renderItem={({ item }) => (<View style={styles.historyItemContainer(theme)}><View style={styles.historyItem(theme, isRTL)}><Text style={styles.historyWeight(theme)}>{item.weight}{t('kgUnit')}</Text><Text style={styles.historyDate(theme)}>{new Date(item.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text></View></View>)}
                 ListEmptyComponent={<View style={styles.emptyHistoryContainer(theme)}><Text style={styles.emptyText(theme)}>{t('historyEmpty')}</Text></View>}
             />
+            {/* ✅ FAB يتبع الاتجاه */}
             <TouchableOpacity style={styles.fab(theme, isRTL)} onPress={() => setModalVisible(true)}><Ionicons name="add" size={30} color={theme.white} /></TouchableOpacity>
+            
             <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={() => setModalVisible(false)}>
                 <View style={styles.modalOverlay(theme)}><View style={styles.modalView(theme)}><Text style={styles.modalTitle(theme)}>{t('addWeightTitle')}</Text><TextInput ref={weightInputRef} style={styles.weightInput(theme, isRTL)} value={newWeight} onChangeText={setNewWeight} keyboardType="numeric" placeholder={t('weightInputPlaceholder')} placeholderTextColor={theme.textSecondary} /><View style={styles.modalActions(isRTL)}><TouchableOpacity style={[styles.actionButton, styles.cancelButton(theme)]} onPress={() => setModalVisible(false)}><Text style={[styles.actionButtonText, styles.cancelButtonText(theme)]}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.actionButton, styles.addButton(theme)]} onPress={handleSaveWeight}><Text style={styles.actionButtonText(theme)}>{t('save')}</Text></TouchableOpacity></View></View></View>
             </Modal>
@@ -209,22 +196,39 @@ const styles = {
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
     historyHeaderCard: (theme) => ({ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 5, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, }),
     historyItemContainer: (theme) => ({ backgroundColor: theme.card, paddingHorizontal: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
+    
+    // ✅ محاذاة يدوية
     sectionTitle: (theme, isRTL) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left', marginBottom: 15 }),
+    
     emptyText: (theme) => ({ textAlign: 'center', color: theme.textSecondary, fontSize: 16, paddingVertical: 20 }),
     chartLoaderContainer: { height: 220, justifyContent: 'center', alignItems: 'center' },
+    
+    // ✅ اتجاه يدوياً
     statsContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-around' }),
+    
     statItem: { alignItems: 'center' },
     statValue: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.textPrimary }),
     statLabel: (theme) => ({ fontSize: 14, color: theme.textSecondary, marginTop: 4 }),
+    
+    // ✅ اتجاه يدوياً
     historyItem: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.background }),
+    
     historyDate: (theme) => ({ fontSize: 16, color: theme.textPrimary }),
     historyWeight: (theme) => ({ fontSize: 16, color: theme.textSecondary, fontWeight: 'bold' }),
+    
+    // ✅ مكان الـ FAB يدوياً
     fab: (theme, isRTL) => ({ position: 'absolute', bottom: 30, [isRTL ? 'left' : 'right']: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 }),
+    
     modalOverlay: (theme) => ({ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.overlay }),
     modalView: (theme) => ({ width: '85%', backgroundColor: theme.card, borderRadius: 20, padding: 25, alignItems: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 }),
     modalTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 15 }),
+    
+    // ✅ محاذاة النص يدوياً
     weightInput: (theme, isRTL) => ({ width: '100%', backgroundColor: theme.inputBackground, color: theme.textPrimary, padding: 15, borderRadius: 10, textAlign: isRTL ? 'right' : 'left', fontSize: 18, fontWeight: 'bold', marginVertical: 10 }),
+    
+    // ✅ اتجاه الأزرار يدوياً
     modalActions: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', width: '100%', marginTop: 20 }),
+    
     actionButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginHorizontal: 5 },
     addButton: (theme) => ({ backgroundColor: theme.primary }),
     actionButtonText: (theme) => ({ color: theme.white, fontSize: 16, fontWeight: 'bold' }),
