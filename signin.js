@@ -1,4 +1,4 @@
-// SignInScreen.js (الكود الكامل والنهائي - هذا هو الكود الصحيح)
+// SignInScreen.js
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -56,7 +56,7 @@ const translations = {
 const SignInScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
     const language = appLanguage || 'en';
-    const isRTL = language === 'ar';
+    const isRTL = language === 'ar'; // التحقق من اللغة العربية
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordSecure, setIsPasswordSecure] = useState(true);
@@ -151,6 +151,7 @@ const SignInScreen = ({ navigation, appLanguage }) => {
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex: 1}}>
                 <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={styles.header(theme)}>
+                        {/* هنا تم تطبيق التعديل للشجرة العلوية */}
                         <Image source={require('./assets/leafshadowcorner.png')} style={styles.headerImageTopLeft(isRTL)} resizeMode="contain" />
                         <Image source={require('./assets/palmleaf3.png')} style={styles.headerImageBottomRight(isRTL)} resizeMode="contain" />
                         <Text style={styles.title(theme, isRTL)}>{t('headerTitle')}</Text>
@@ -206,7 +207,20 @@ const SignInScreen = ({ navigation, appLanguage }) => {
 const styles = {
     safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     header: (theme) => ({ backgroundColor: theme.primary, height: height * 0.35, borderBottomLeftRadius: 50, borderBottomRightRadius: 50, justifyContent: 'flex-start', paddingHorizontal: 30, paddingTop: 60, position: 'relative', overflow: 'hidden' }),
-    headerImageTopLeft: (isRTL) => ({ position: 'absolute', top: -60, ...(isRTL ? { right: -70, transform: [{ scaleX: -1 }] } : { left: -70 }), width: 290, height: 290, opacity: 0.8 }),
+    
+    // التعديل هنا: إذا كان عربي (isRTL) تنتقل لليمين وتنعكس أفقياً
+    headerImageTopLeft: (isRTL) => ({
+        position: 'absolute',
+        top: -60,
+        ...(isRTL 
+            ? { right: -70, transform: [{ scaleX: -1 }] } // عربي: يمين + عكس الصورة
+            : { left: -70 }                                // إنجليزي: يسار عادي
+        ),
+        width: 290,
+        height: 290,
+        opacity: 0.8 
+    }),
+    
     headerImageBottomRight: (isRTL) => ({ position: 'absolute', bottom: -7, ...(isRTL ? { left: 20 } : { right: 20 }), width: 130, height: 130, zIndex: 2 }),
     title: (theme, isRTL) => ({ fontSize: 42, fontWeight: 'bold', color: theme.headerText, textAlign: isRTL ? 'right' : 'left' }),
     subtitle: (theme, isRTL) => ({ fontSize: 18, color: theme.headerText, marginTop: 5, textAlign: isRTL ? 'right' : 'left' }),

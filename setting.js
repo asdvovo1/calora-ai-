@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView,
   StatusBar, Animated, I18nManager, Platform, Modal, TextInput, Clipboard,
-  ActivityIndicator, DevSettings, NativeModules
+  ActivityIndicator, NativeModules
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,8 @@ import { Pedometer } from 'expo-sensors';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GoogleFit, { Scopes } from 'react-native-google-fit';
 import { useFocusEffect } from '@react-navigation/native';
+// ✅ إضافة مكتبة التحديثات لإعادة التشغيل
+import * as Updates from 'expo-updates';
 
 import notificationsData from './notificationsdata'; 
 
@@ -24,7 +26,7 @@ const translations = {
     workoutReminder: 'Workout Reminder',
     stepsGoalReminder: 'Steps Goal Reminder',
     stepsGoalReminderDesc: 'Get a notification when you reach your daily step goal.',
-    save: 'Save', languageSaved: 'Language Saved', languageSettingsUpdated: 'Language settings updated. Please restart the app to apply changes.',
+    save: 'Save', languageSaved: 'Language Saved', languageSettingsUpdated: 'Language settings updated. The app will restart now.',
     deleteAccountTitle: 'Delete Account Permanently', deleteAccountMessage: 'Are you sure? This action cannot be undone...',
     cancel: 'Cancel', delete: 'Delete',
     exportDataDescription: 'Your entire food log is prepared below as CSV text...',
@@ -57,7 +59,7 @@ const translations = {
     workoutReminder: 'تذكير التمرين',
     stepsGoalReminder: 'تذكير هدف الخطوات',
     stepsGoalReminderDesc: 'احصل على إشعار عند وصولك لهدفك اليومي من الخطوات.',
-    save: 'حفظ', languageSaved: 'تم حفظ اللغة', languageSettingsUpdated: 'تم تحديث إعدادات اللغة. يرجى إعادة تشغيل التطبيق لتطبيق التغييرات.',
+    save: 'حفظ', languageSaved: 'تم حفظ اللغة', languageSettingsUpdated: 'تم تحديث إعدادات اللغة. سيتم إعادة تشغيل التطبيق الآن.',
     deleteAccountTitle: 'حذف الحساب نهائياً', deleteAccountMessage: 'هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء...',
     cancel: 'إلغاء', delete: 'حذف',
     exportDataDescription: 'تم تجهيز كامل سجل طعامك في الأسفل كنص CSV...',
@@ -116,7 +118,6 @@ const formatTime = (date, lang = 'en') => {
     return `${hours}:${minutes} ${ampm}`;
 };
 
-// ✅✅✅ الحل النهائي: فصلنا المسارات للعربي والانجليزي ✅✅✅
 const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -131,9 +132,6 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   const thumbColor = '#FFFFFF';
   
-  // 🔥 هنا الفصل الحقيقي:
-  // لو عربي (isRTL): ابدأ من الصفر وارجع لورا (-26) عشان تفضل جوه المربع
-  // لو انجليزي: ابدأ من الصفر واطلع لقدام (26)
   const translateX = animation.interpolate({ 
       inputRange: [0, 1], 
       outputRange: isRTL ? [-27, 0] : [27, 0] 
@@ -145,8 +143,6 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
           styles.toggleContainer, 
           { 
               backgroundColor: trackColor, 
-              // لو عربي: بنسيبه RTL طبيعي عشان يبدأ من اليمين
-              // لو انجليزي: بنجبره LTR عشان يبدأ من الشمال
               direction: isRTL ? 'rtl' : 'ltr', 
               alignItems: 'flex-start', 
               justifyContent: 'center'
@@ -183,7 +179,6 @@ const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => (
     </TouchableOpacity> 
 );
 
-// ✅ مررنا isRTL هنا عشان يوصل للزرار
 const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
@@ -217,7 +212,6 @@ const SettingsToggleItem = ({ icon, label, description, value, onValueChange, th
       </TouchableOpacity>
     )}
     
-    {/* بنبعت isRTL للزرار */}
     <DarkModeToggle value={value} onValueChange={onValueChange} isRTL={isRTL} />
   </View>
 );
@@ -479,6 +473,7 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const handleDisconnectGoogleFit = async () => { try { await GoogleFit.disconnect(); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert("Google Fit", t('disconnectSuccess')); } catch (error) { console.error("DISCONNECT_ERROR", error); } };
 
+  // ✅✅✅ دالة حفظ اللغة الجديدة باستخدام Expo Updates ✅✅✅
   const handleSaveLanguage = async () => {
     if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
     try {
@@ -498,13 +493,11 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
                 text: 'OK', 
                 onPress: async () => { 
                     try {
-                        if (DevSettings && DevSettings.reload) {
-                            DevSettings.reload();
-                        } else if (NativeModules.DevSettings && NativeModules.DevSettings.reload) {
-                            NativeModules.DevSettings.reload();
-                        }
+                        // استخدمنا Updates.reloadAsync عشان يشتغل في الـ APK
+                        await Updates.reloadAsync();
                     } catch(e) {
-                       console.log("Manual restart required");
+                       console.log("Error reloading", e);
+                       Alert.alert("Error", "Please close and reopen the app to apply changes.");
                     }
                 }, 
             }, 
@@ -589,7 +582,6 @@ const styles = StyleSheet.create({
   
   sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 28, paddingVertical: 10, marginTop: 10 },
   
-  // ستايل الزرار المخصص
   toggleContainer: { width: 52, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center', alignItems: 'flex-start' },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
   

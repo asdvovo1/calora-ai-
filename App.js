@@ -3,18 +3,18 @@ import 'react-native-get-random-values';
 import 'react-native-gesture-handler';
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, I18nManager, DevSettings } from 'react-native';
+import { View, StyleSheet, I18nManager } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { supabase } from './supabaseclient';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// ✅ إضافة مكتبة التحديثات هنا أيضاً
+import * as Updates from 'expo-updates';
 
-// --- استيراد شاشتك المخصصة (هذا صحيح الآن) ---
 import SplashScreen from './Splash'; 
 
-// --- استيراد باقي الشاشات ---
 import IndexScreen from './Index';
 import SignInScreen from './signin';
 import SignUpScreen from './signup';
@@ -35,7 +35,7 @@ const App = () => {
   const [session, setSession] = useState(null);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
   const [appLanguage, setAppLanguage] = useState('en');
-  const [appIsReady, setAppIsReady] = useState(false); // هذا سيتحكم في عرض شاشتك المخصصة
+  const [appIsReady, setAppIsReady] = useState(false);
 
   const handleDeepLink = async (url) => {
     if (!url) return;
@@ -63,9 +63,12 @@ const App = () => {
         const currentLang = savedLang || 'en';
         const isRTLRequired = currentLang === 'ar';
 
+        // ✅ التأكد من اتجاه اللغة عند فتح التطبيق
         if (I18nManager.isRTL !== isRTLRequired) {
+          I18nManager.allowRTL(isRTLRequired);
           I18nManager.forceRTL(isRTLRequired);
-          DevSettings.reload();
+          // استخدام Updates لعمل ريستارت في الـ APK
+          await Updates.reloadAsync();
           return;
         }
 
@@ -81,10 +84,9 @@ const App = () => {
       } catch (e) {
         console.warn('Initialization error:', e);
       } finally {
-        // بعد انتهاء التحميل، انتظر قليلاً لعرض شاشتك المخصصة ثم اعرض التطبيق
         setTimeout(() => {
           setAppIsReady(true);
-        }, 2500); // <-- مدة عرض شاشتك المخصصة من ملف Splash.js
+        }, 2500);
       }
     };
 
@@ -108,7 +110,6 @@ const App = () => {
     };
   }, []);
 
-  // هذا الكود صحيح: يعرض شاشتك المخصصة طالما التطبيق ليس جاهزاً
   if (!appIsReady) {
     return <SplashScreen />;
   }
@@ -128,7 +129,6 @@ const App = () => {
             initialRouteName={getInitialRouteName()}
             screenOptions={{ headerShown: false }}
           >
-            {/* باقي الشاشات كما هي */}
             <Stack.Screen name="Index">
               {(props) => <IndexScreen {...props} appLanguage={appLanguage} />}
             </Stack.Screen>
