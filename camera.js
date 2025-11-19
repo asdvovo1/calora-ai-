@@ -1,5 +1,4 @@
-// camera.js (الكود الصحيح والنهائي - تم رفع أزرار التحكم)
-
+// camera.js - الكود الكامل والصحيح
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, Pressable, Modal, TouchableOpacity, Alert, Image, FlatList, TextInput } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera'; 
@@ -7,9 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Progress from 'react-native-progress';
 import { Ionicons } from '@expo/vector-icons';
-import { searchEgyptianFoodsWithImages } from './supabaseclient';
+import { searchEgyptianFoodsWithImages, supabase } from './supabaseclient';
 
-// ... (كل الثوابت والدوال المساعدة تبقى كما هي بدون تغيير)
 const GOOGLE_VISION_API_KEY = 'AIzaSyB7Lo417UOkHMMd7_RPVo4AmOqV2IioSgo'; 
 const NUTRIENT_GOALS = { fiber: 30, sugar: 50, sodium: 2300 };
 const USDA_API_KEY = 'EwFYKP3Uy9RoPE0MsngLOlh0YHRFDexKBKZuAstd';
@@ -24,7 +22,6 @@ const MacroBar = ({ label, consumed, goal, color, theme, isRTL, unit = 'g' }) =>
 const ProductNameModal = ({ visible, onClose, onConfirm, theme, t, isRTL }) => { const [name, setName] = useState(''); const styles = getStyles(theme, isRTL); const handleConfirm = () => { if (!name.trim()) { Alert.alert(t('pleaseEnterName')); return; } onConfirm(name.trim()); setName(''); }; return ( <Modal visible={visible} transparent={true} animationType="fade"><View style={styles.mealSelectionBackdrop}><View style={[styles.mealSelectionContainer, { alignItems: 'stretch' }]}><Text style={styles.mealSelectionTitle}>{t('enterProductName')}</Text><TextInput style={styles.quantityInput} value={name} onChangeText={setName} placeholder={t('productName')} placeholderTextColor={theme.secondaryText} autoFocus={true} /><View style={styles.modalActions}><TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={onClose}><Text style={[styles.actionButtonText, styles.cancelButtonText]}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.actionButton, styles.addButton]} onPress={handleConfirm}><Text style={[styles.actionButtonText]}>{t('confirm')}</Text></TouchableOpacity></View></View></View></Modal> );};
 
 const CameraScreen = () => {
-    // ... (كل الـ state والـ hooks تبقى كما هي)
     const cameraRef = useRef(null);
     const navigation = useNavigation();
     const [theme, setTheme] = useState(lightTheme);
@@ -47,10 +44,8 @@ const CameraScreen = () => {
     const styles = getStyles(theme, isRTL);
 
     useEffect(() => {
-        if (!permission?.granted) {
-            requestPermission();
-        }
-    }, []);
+        if (!permission?.granted) { requestPermission(); }
+    }, [permission]);
 
     useFocusEffect(useCallback(() => {
         setScanMode('food');
@@ -58,7 +53,6 @@ const CameraScreen = () => {
         loadAllData();
     }, []));
 
-    // ... (كل الدوال الأخرى تبقى كما هي)
     const takePicture = async () => { if (cameraRef.current) { const photo = await cameraRef.current.takePictureAsync({ quality: 0.7, base64: true }); setCapturedPhotoUri(photo.uri); if (scanMode === 'food') { analyzePhoto(photo.base64); } else if (scanMode === 'label') { analyzeLabelPhoto(photo.base64); } } };
     const analyzePhoto = async (imageBase64) => { setIsAnalyzing(true); const CLARIFAI_USER_ID = 'calora1'; const CLARIFAI_APP_ID = 'Calorie-ai'; try { const clarifaiResponse = await fetch("https://api.clarifai.com/v2/models/food-item-recognition/outputs", { method: 'POST', headers: { 'Accept': 'application/json', 'Authorization': 'Key ' + CLARIFAI_PAT }, body: JSON.stringify({ "user_app_id": { "user_id": CLARIFAI_USER_ID, "app_id": CLARIFAI_APP_ID }, "inputs": [{ "data": { "image": { "base64": imageBase64 } } }] }) }); const clarifaiData = await clarifaiResponse.json(); if (clarifaiData.status.code !== 10000 || !clarifaiData.outputs[0].data.concepts.length) { throw new Error('Clarifai could not identify the food.'); } const foodNameFromClarifai = clarifaiData.outputs[0].data.concepts[0].name; const localResults = await searchEgyptianFoodsWithImages(foodNameFromClarifai); if (localResults.length > 0) { const matchedFood = { ...localResults[0], quantity: 100 }; setAnalysisResult([matchedFood]); setBaseAnalysisResult([matchedFood]); } else { Alert.alert(t('foodIdentified'), t('notInLocalDB', {foodName: foodNameFromClarifai})); const usdaResult = await getNutritionDataFromUSDA(foodNameFromClarifai, USDA_API_KEY); if (usdaResult) { setAnalysisResult([usdaResult]); setBaseAnalysisResult([usdaResult]); } else { throw new Error('Food not found in any database.'); } } } catch (error) { console.error("Analysis failed:", error); Alert.alert(t('analysisFailed'), error.message, [{ text: t('tryAgain') }]); } finally { setIsAnalyzing(false); } };
     const analyzeLabelPhoto = async (imageBase64) => { if (GOOGLE_VISION_API_KEY === 'YOUR_GOOGLE_CLOUD_VISION_API_KEY') { Alert.alert("Error", "Please add your Google Cloud Vision API key to the code."); return; } setIsAnalyzing(true); try { const body = { requests: [{ image: { content: imageBase64 }, features: [{ type: 'TEXT_DETECTION' }] }] }; const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const result = await response.json(); if (result.responses && result.responses[0].fullTextAnnotation) { const detectedText = result.responses[0].fullTextAnnotation.text; const nutritionData = parseNutritionText(detectedText); if (Object.values(nutritionData).some(val => val > 0)) { setParsedOcrData(nutritionData); setNameModalVisible(true); } else { Alert.alert(t('analysisFailed'), t('noNutritionDataFound')); } } else { throw new Error('No text found in image.'); } } catch (error) { console.error("Label analysis failed:", error); Alert.alert(t('analysisFailed'), error.message); } finally { setIsAnalyzing(false); } };
@@ -68,39 +62,47 @@ const CameraScreen = () => {
     const handleEditQuantityPress = (item) => { setEditingItem(item); setQuantityModalVisible(true); };
     const handleConfirmQuantity = (newQuantity) => { const baseItem = baseAnalysisResult.find(i => i.id === editingItem.id); const ratio = newQuantity / baseItem.quantity; const updatedItem = { ...editingItem, quantity: newQuantity, calories: baseItem.calories * ratio, p: baseItem.p * ratio, c: baseItem.c * ratio, f: baseItem.f * ratio, fib: (baseItem.fib || 0) * ratio, sug: (baseItem.sug || 0) * ratio, sod: (baseItem.sod || 0) * ratio }; setAnalysisResult(analysisResult.map(i => i.id === editingItem.id ? updatedItem : i)); setEditingItem(null); setQuantityModalVisible(false); };
     const handleAddToDiary = () => { if (!analysisResult) return; setShowMealSelection(true); };
-    const saveMealTo = async (mealKey) => { try { const todayKey = new Date().toISOString().slice(0, 10); const todayLogJson = await AsyncStorage.getItem(todayKey); let todayLog = todayLogJson ? JSON.parse(todayLogJson) : {}; const finalItems = analysisResult.map(item => ({ ...item, quantity: `${Math.round(item.quantity)}g`, capturedImageUri: capturedPhotoUri })); todayLog[mealKey] = [...(todayLog[mealKey] || []), ...finalItems]; await AsyncStorage.setItem(todayKey, JSON.stringify(todayLog)); setShowMealSelection(false); setAnalysisResult(null); setBaseAnalysisResult(null); setCapturedPhotoUri(null); navigation.navigate('DiaryStack', { screen: 'DiaryHome' }); Alert.alert(t('mealAddedSuccess')); } catch (e) { console.error("Failed to save meal:", e); Alert.alert(t('mealAddedError')); } };
+    
+    const saveMealTo = async (mealKey) => {
+        const todayKey = new Date().toISOString().slice(0, 10);
+        try {
+            const todayLogJson = await AsyncStorage.getItem(todayKey);
+            let todayLog = todayLogJson ? JSON.parse(todayLogJson) : {};
+            const finalItems = analysisResult.map(item => ({ ...item, quantity: `${Math.round(item.quantity)}g`, capturedImageUri: capturedPhotoUri }));
+            todayLog[mealKey] = [...(todayLog[mealKey] || []), ...finalItems];
+            await AsyncStorage.setItem(todayKey, JSON.stringify(todayLog));
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { error } = await supabase
+                    .from('daily_logs')
+                    .upsert({ user_id: user.id, log_date: todayKey, log_data: todayLog }, { onConflict: 'user_id, log_date' });
+                if (error) throw error;
+            }
+
+            setShowMealSelection(false);
+            setAnalysisResult(null);
+            setBaseAnalysisResult(null);
+            setCapturedPhotoUri(null);
+            navigation.navigate('DiaryStack', { screen: 'DiaryHome' });
+            Alert.alert(t('mealAddedSuccess'));
+        } catch (e) {
+            console.error("Failed to save meal:", e);
+            Alert.alert(t('mealAddedError'));
+        }
+    };
+    
     const handleCancelAnalysis = () => { setAnalysisResult(null); setBaseAnalysisResult(null); setCapturedPhotoUri(null); setNameModalVisible(false); setParsedOcrData(null); };
 
-    if (!permission) {
-        return <View style={styles.permissionContainer}><ActivityIndicator size="large" color={theme.primary} /></View>;
-    }
-
-    if (!permission.granted) {
-        return (
-            <View style={styles.permissionContainer}>
-                <Ionicons name="camera-reverse-outline" size={80} color={theme.permissionIcon} />
-                <Text style={styles.permissionTitle}>{t('permissionDenied')}</Text>
-                <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-                    <Text style={styles.permissionButtonText}>{t('grantPermission')}</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-    
-    // ... (المتغيرات plateTotals, totalConsumedCalories, etc. تبقى كما هي)
+    if (!permission) { return <View style={styles.permissionContainer}><ActivityIndicator size="large" color={theme.primary} /></View>; }
+    if (!permission.granted) { return ( <View style={styles.permissionContainer}><Ionicons name="camera-reverse-outline" size={80} color={theme.permissionIcon} /><Text style={styles.permissionTitle}>{t('permissionDenied')}</Text><TouchableOpacity style={styles.permissionButton} onPress={requestPermission}><Text style={styles.permissionButtonText}>{t('grantPermission')}</Text></TouchableOpacity></View> ); }
     const plateTotals = analysisResult ? analysisResult.reduce((acc, item) => ({ calories: acc.calories + (item.calories || 0), protein: acc.protein + (item.p || 0), carbs: acc.carbs + (item.c || 0), fat: acc.fat + (item.f || 0), fib: acc.fib + (item.fib || 0), sug: acc.sug + (item.sug || 0), sod: acc.sod + (item.sod || 0) }), { calories: 0, protein: 0, carbs: 0, fat: 0, fib: 0, sug: 0, sod: 0 }) : { calories: 0, protein: 0, carbs: 0, fat: 0, fib: 0, sug: 0, sod: 0 };
     const totalConsumedCalories = consumedTotals.food + plateTotals.calories;
     const getLoadingText = () => { if (scanMode === 'food') return t('analyzingPlate'); if (scanMode === 'barcode') return t('scanning'); if (scanMode === 'label') return t('analyzingLabel'); return ''; };
 
-
     return (
         <View style={styles.container}>
-            <CameraView 
-                ref={cameraRef} 
-                style={StyleSheet.absoluteFill} 
-                facing={'back'}
-                onBarCodeScanned={scanMode === 'barcode' && !isAnalyzing ? handleBarCodeScanned : undefined}
-            />
+            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={'back'} onBarCodeScanned={scanMode === 'barcode' && !isAnalyzing ? handleBarCodeScanned : undefined} />
             {isAnalyzing && <View style={styles.loadingOverlay}><ActivityIndicator size="large" color="#FFF" /><Text style={styles.loadingText}>{getLoadingText()}</Text></View>}
             {scanMode === 'barcode' && <View style={styles.barcodeFocusFrame} />}
             {scanMode === 'label' && <View style={styles.ocrFocusFrame} />}
@@ -112,7 +114,6 @@ const CameraScreen = () => {
                     <TouchableOpacity style={[styles.modeButton, scanMode === 'barcode' && styles.modeButtonActive]} onPress={() => setScanMode('barcode')}><Ionicons name="barcode-outline" size={22} color={scanMode === 'barcode' ? theme.primary : theme.secondaryText} /><Text style={[styles.modeButtonText, scanMode === 'barcode' && styles.modeButtonTextActive]}>{t('barcode')}</Text></TouchableOpacity>
                 </View>
             </View>
-            {/* ... (كل الـ Modals تبقى كما هي) ... */}
             <Modal animationType="slide" transparent={true} visible={!!analysisResult}><View style={styles.modalBackdrop}><View style={styles.modalContainer}><FlatList data={analysisResult} keyExtractor={(item) => item.id.toString()} contentContainerStyle={styles.modalContentPadding} ListHeaderComponent={ <> <Text style={styles.modalTitle}>{t('plateResults')}</Text> {analysisResult && analysisResult.length === 1 && analysisResult[0].image ? (<Image source={{ uri: analysisResult[0].image }} style={styles.productImage} />) : null} </> } renderItem={({ item }) => ( <View style={styles.foodItemContainer}><View style={styles.foodItemText}><Text style={styles.foodItemName}>{item.name}</Text><TouchableOpacity style={styles.quantityButton} onPress={() => handleEditQuantityPress(item)}><Text style={styles.foodItemQuantity}>{Math.round(item.quantity)}g </Text><Ionicons name="pencil" size={14} color={theme.primary} /></TouchableOpacity></View><Text style={styles.foodItemCalories}>{Math.round(item.calories)} Cal</Text></View> )} ListFooterComponent={ <View>{analysisResult && analysisResult.length > 1 && (<View style={styles.plateTotalContainer}><Text style={styles.plateTotalLabel}>{t('plateTotal')}</Text><Text style={styles.plateTotalValue}>{Math.round(plateTotals.calories)} Cal</Text></View>)}<View style={styles.modalSummary}><View style={styles.modalGoalItem}><Text style={styles.modalGoalLabel}>{t('dailyGoal')}</Text><Text style={styles.modalGoalValue}>{Math.round(dailyGoal.calories)}</Text></View><View style={styles.modalProgressCircle}><Progress.Circle size={100} progress={dailyGoal.calories > 0 ? totalConsumedCalories / dailyGoal.calories : 0} color={theme.primary} unfilledColor={`${theme.primary}33`} thickness={8} borderWidth={0} showsText={false} /><View style={styles.circleTextContainer}><Text style={styles.remainingValue}>{Math.round(dailyGoal.calories - totalConsumedCalories)}</Text><Text style={styles.remainingLabel}>{t('remaining')}</Text></View></View><View style={styles.modalGoalItem}><Text style={styles.modalGoalLabel}>{t('plateCalories')}</Text><Text style={[styles.modalGoalValue, { color: theme.danger }]}>+{Math.round(plateTotals.calories)}</Text></View></View><View style={styles.macrosContainer}><Text style={styles.macrosTitle}>{t('afterAddingMeal')}</Text><MacroBar label={t('carbs')} consumed={consumedTotals.carbs + plateTotals.carbs} goal={dailyGoal.carbs} color="#4285F4" theme={theme} isRTL={isRTL} /><MacroBar label={t('protein')} consumed={consumedTotals.protein + plateTotals.protein} goal={dailyGoal.protein} color="#EA4335" theme={theme} isRTL={isRTL} /><MacroBar label={t('fat')} consumed={consumedTotals.fat + plateTotals.fat} goal={dailyGoal.fat} color="#FBBC05" theme={theme} isRTL={isRTL} /><MacroBar label={t('fiber')} consumed={consumedTotals.fib + plateTotals.fib} goal={NUTRIENT_GOALS.fiber} color="#34A853" theme={theme} isRTL={isRTL} /><MacroBar label={t('sugar')} consumed={consumedTotals.sug + plateTotals.sug} goal={NUTRIENT_GOALS.sugar} color="#9C27B0" theme={theme} isRTL={isRTL} /><MacroBar label={t('sodium')} consumed={consumedTotals.sod + plateTotals.sod} goal={NUTRIENT_GOALS.sodium} color="#2196F3" theme={theme} isRTL={isRTL} unit='mg' /></View><View style={styles.modalActions}><TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={handleCancelAnalysis}><Text style={[styles.actionButtonText, styles.cancelButtonText]}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.actionButton, styles.addButton]} onPress={handleAddToDiary}><Text style={[styles.actionButtonText]}>{t('addToDiary')}</Text></TouchableOpacity></View></View> } /></View></View></Modal>
             <MealSelectionModal visible={showMealSelection} onClose={() => setShowMealSelection(false)} onSave={saveMealTo} theme={theme} t={t} isRTL={isRTL} />
             <QuantityEditModal visible={isQuantityModalVisible} item={editingItem} onClose={() => setQuantityModalVisible(false)} onConfirm={handleConfirmQuantity} theme={theme} t={t} isRTL={isRTL} />
@@ -122,23 +123,8 @@ const CameraScreen = () => {
 };
 
 const getStyles = (theme, isRTL) => StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: theme.cameraBackground 
-    },
-    // ... (كل الستايلات الأخرى تبقى كما هي، باستثناء bottomContainer)
-    
-    // ✅ *** التعديل الوحيد هنا ***
-    bottomContainer: {
-        position: 'absolute',
-        bottom: 80, // <-- رفعنا الحاوية للأعلى لتظهر فوق شريط التنقل
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        // لم نعد بحاجة لـ paddingBottom لأننا رفعنا الحاوية كلها
-    },
-    
-    // ... (باقي الستايلات من هنا)
+    container: { flex: 1, backgroundColor: theme.cameraBackground },
+    bottomContainer: { position: 'absolute', bottom: 80, left: 0, right: 0, alignItems: 'center', },
     loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }, 
     loadingText: { color: theme.textOnDark, marginTop: 15, fontSize: 18, fontWeight: '600' }, 
     permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background, padding: 20 }, 

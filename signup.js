@@ -1,4 +1,4 @@
-// SignUpScreen.js (الكود الكامل والمعدل)
+// SignUpScreen.js (الكود الكامل والنهائي)
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -17,43 +17,20 @@ import { makeRedirectUri } from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// ... (الثيمات والترجمات كما هي، لا تغيير) ...
 const { width, height } = Dimensions.get('window');
 
-const lightTheme = {
-    primary: '#4CAF50', background: '#F8F9FA', card: '#FFFFFF', textPrimary: '#212529', textSecondary: '#6C757D',
-    borderColor: '#E9ECEF', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#FFFFFF',
-};
-const darkTheme = {
-    primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF', textSecondary: '#B0B0B0',
-    borderColor: '#2C2C2C', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#2C2C2C',
-};
-const translations = {
-    ar: {
-        headerTitle: 'إنشاء حساب', headerSubtitle: 'انضم إلى مجتمعنا', cardTitle: 'حساب جديد', usernamePlaceholder: 'الاسم بالكامل',
-        emailPlaceholder: 'البريد الإلكتروني', passwordPlaceholder: 'كلمة المرور', confirmPasswordPlaceholder: 'تأكيد كلمة المرور',
-        signUpButton: 'إنشاء حساب', errorTitle: 'خطأ', fillFieldsError: 'الرجاء ملء جميع الحقول.',
-        invalidEmailError: 'الرجاء إدخال بريد إلكتروني صحيح.', passwordMismatchError: 'كلمتا المرور غير متطابقتين.',
-        accountCreationError: 'حدث خطأ أثناء إنشاء الحساب.', successTitle: 'تم بنجاح!',
-        accountSuccess: 'تم إنشاء حسابك. برجاء التحقق من بريدك الإلكتروني لتفعيل الحساب قبل تسجيل الدخول.',
-        dividerText: 'أو أنشئ حساب عبر',
-    },
-    en: {
-        headerTitle: 'Create Account', headerSubtitle: 'Join our community', cardTitle: 'Sign Up', usernamePlaceholder: 'Full Name',
-        emailPlaceholder: 'Email', passwordPlaceholder: 'Password', confirmPasswordPlaceholder: 'Confirm Password',
-        signUpButton: 'Sign Up', errorTitle: 'Error', fillFieldsError: 'Please fill in all fields.',
-        invalidEmailError: 'Please enter a valid email address.', passwordMismatchError: 'Passwords do not match.',
-        accountCreationError: 'An error occurred while creating the account.', successTitle: 'Success!',
-        accountSuccess: 'Your account has been created. Please check your email to activate your account before signing in.',
-        dividerText: 'Or sign up with',
-    }
-};
+const lightTheme = { primary: '#4CAF50', background: '#F8F9FA', card: '#FFFFFF', textPrimary: '#212529', textSecondary: '#6C757D', borderColor: '#E9ECEF', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#FFFFFF' };
+const darkTheme = { primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF', textSecondary: '#B0B0B0', borderColor: '#2C2C2C', headerText: '#FFFFFF', statusBar: 'light-content', inputBackground: '#2C2C2C' };
+const translations = { ar: { headerTitle: 'إنشاء حساب', headerSubtitle: 'انضم إلى مجتمعنا', cardTitle: 'حساب جديد', usernamePlaceholder: 'الاسم بالكامل', emailPlaceholder: 'البريد الإلكتروني', passwordPlaceholder: 'كلمة المرور', confirmPasswordPlaceholder: 'تأكيد كلمة المرور', signUpButton: 'إنشاء حساب', errorTitle: 'خطأ', fillFieldsError: 'الرجاء ملء جميع الحقول.', invalidEmailError: 'الرجاء إدخال بريد إلكتروني صحيح.', passwordMismatchError: 'كلمتا المرور غير متطابقتين.', accountCreationError: 'حدث خطأ أثناء إنشاء الحساب.', successTitle: 'تم بنجاح!', accountSuccess: 'تم إنشاء حسابك. برجاء التحقق من بريدك الإلكتروني لتفعيل الحساب قبل تسجيل الدخول.', dividerText: 'أو أنشئ حساب عبر' }, en: { headerTitle: 'Create Account', headerSubtitle: 'Join our community', cardTitle: 'Sign Up', usernamePlaceholder: 'Full Name', emailPlaceholder: 'Email', passwordPlaceholder: 'Password', confirmPasswordPlaceholder: 'Confirm Password', signUpButton: 'Sign Up', errorTitle: 'Error', fillFieldsError: 'Please fill in all fields.', invalidEmailError: 'Please enter a valid email address.', passwordMismatchError: 'Passwords do not match.', accountCreationError: 'An error occurred while creating the account.', successTitle: 'Success!', accountSuccess: 'Your account has been created. Please check your email to activate your account before signing in.', dividerText: 'Or sign up with' } };
 
-const SignUpScreen = ({ navigation }) => {
-    // ... (كل الـ state و useFocusEffect كما هي، لا تغيير) ...
+// 🔧 --- التعديل هنا: استقبال appLanguage --- 🔧
+const SignUpScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
-    const [language, setLanguage] = useState('en');
-    const [isRTL, setIsRTL] = useState(false);
+    
+    // ✅ نستخدم اللغة القادمة من App.js مباشرة
+    const language = appLanguage || 'en';
+    const isRTL = language === 'ar';
+
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -66,17 +43,23 @@ const SignUpScreen = ({ navigation }) => {
 
     const t = (key) => translations[language]?.[key] || key;
 
+    // 🔧 --- التعديل هنا: هذا الـ Hook الآن فقط للـ Theme --- 🔧
     useFocusEffect(useCallback(() => {
-        const loadSettings = async () => { try { const savedTheme = await AsyncStorage.getItem('isDarkMode'); setTheme(savedTheme === 'true' ? darkTheme : lightTheme); const savedLang = await AsyncStorage.getItem('appLanguage'); const currentLang = savedLang || 'en'; setLanguage(currentLang); setIsRTL(currentLang === 'ar'); } catch (e) { console.error('Failed to load settings.', e); } };
-        loadSettings();
+        const loadTheme = async () => {
+            try {
+                const savedTheme = await AsyncStorage.getItem('isDarkMode');
+                setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
+            } catch (e) { console.error('Failed to load theme.', e); }
+        };
+        loadTheme();
     }, []));
+    
     const handleEmailChange = (text) => {
         const englishEmailRegex = /^[a-zA-Z0-9@._-]*$/;
         if (englishEmailRegex.test(text)) { setEmail(text); }
     };
 
     const handleSignUp = async () => {
-        // ... (لا تغيير في هذه الدالة، منطقها سليم)
         if (!username.trim() || !email.trim() || !password || !confirmPassword) { Alert.alert(t('errorTitle'), t('fillFieldsError')); return; }
         if (!email.includes('@') || !email.includes('.')) { Alert.alert(t('errorTitle'), t('invalidEmailError')); return; }
         if (password !== confirmPassword) { Alert.alert(t('errorTitle'), t('passwordMismatchError')); return; }
@@ -84,51 +67,27 @@ const SignUpScreen = ({ navigation }) => {
         try {
             const [firstName, ...lastNameParts] = username.trim().split(' ');
             const lastName = lastNameParts.join(' ');
-            const { data, error } = await supabase.auth.signUp({
-                email: email.toLowerCase(),
-                password: password,
-                options: { 
-                    data: { 
-                        firstName: firstName,
-                        lastName: lastName,
-                        onboarding_complete: false, // ✅ هذا السطر هو الأهم للمستخدم الجديد
-                    } 
-                },
-            });
+            const { data, error } = await supabase.auth.signUp({ email: email.toLowerCase(), password: password, options: { data: { firstName: firstName, lastName: lastName, onboarding_complete: false } } });
             if (error) { Alert.alert(t('errorTitle'), error.message); } 
             else if (data.user) { Alert.alert(t('successTitle'), t('accountSuccess'), [{ text: 'Ok', onPress: () => navigation.navigate('SignIn') }]); }
         } catch (error) { Alert.alert(t('errorTitle'), t('accountCreationError')); } 
         finally { setLoading(false); }
     };
     
-    // ✅ --- التعديل الرئيسي هنا --- ✅
     const handleSocialSignIn = async (provider) => {
         if (provider === 'google') setGoogleLoading(true);
         if (provider === 'facebook') setFacebookLoading(true);
-        
         try {
             const redirectUri = makeRedirectUri({ scheme: 'calora' });
-            const { data, error } = await supabase.auth.signInWithOAuth({
-                provider: provider,
-                options: { redirectTo: redirectUri },
-            });
-
+            const { data, error } = await supabase.auth.signInWithOAuth({ provider: provider, options: { redirectTo: redirectUri } });
             if (error) throw error;
-            
             const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-            
             if (res.type === 'success') {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session) {
                     const { user } = session;
-
-                    // ✨ منطق التحقق الجديد
                     const isNewUser = !user.user_metadata?.onboarding_complete;
-                    
-                    if (isNewUser) {
-                        navigation.replace('BasicInfo');
-                    }
-                    // 🔥 لا يوجد 'else' هنا! App.js سيتولى الأمر.
+                    if (isNewUser) { navigation.replace('BasicInfo'); }
                 }
             }
         } catch (error) {
@@ -140,13 +99,9 @@ const SignUpScreen = ({ navigation }) => {
     };
 
     return (
-        // ... (كل كود الـ JSX والـ styles كما هو، لا تغيير) ...
         <SafeAreaView style={styles.container(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.primary} />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                style={{ flex: 1 }}
-            >
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
                     <View style={styles.header(theme)}>
                         <Image source={require('./assets/palmleaf1.png')} style={styles.headerImageLeft} resizeMode="contain" />
@@ -209,16 +164,12 @@ const SignUpScreen = ({ navigation }) => {
 };
 const styles = {
     container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    header: (theme) => ({
-        backgroundColor: theme.primary, height: height * 0.3, borderBottomLeftRadius: 50, borderBottomRightRadius: 50, justifyContent: 'center', paddingHorizontal: 30, paddingTop: 20, position: 'relative', overflow: 'hidden'
-    }),
+    header: (theme) => ({ backgroundColor: theme.primary, height: height * 0.3, borderBottomLeftRadius: 50, borderBottomRightRadius: 50, justifyContent: 'center', paddingHorizontal: 30, paddingTop: 20, position: 'relative', overflow: 'hidden' }),
     headerImageLeft: { position: 'absolute', top: -40, left: -40, width: 200, height: 200, transform: [{ rotate: '10deg' }] },
     headerImageRight: { position: 'absolute', top: -40, right: -40, width: 200, height: 200, transform: [{ rotate: '-9deg' }] },
     title: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.headerText }),
     subtitle: (theme) => ({ fontSize: 18, color: theme.headerText, marginTop: 5 }),
-    card: (theme) => ({
-        marginHorizontal: 20, marginTop: -40, marginBottom: 20, backgroundColor: theme.card, borderRadius: 30, paddingHorizontal: 25, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 15
-    }),
+    card: (theme) => ({ marginHorizontal: 20, marginTop: -40, marginBottom: 20, backgroundColor: theme.card, borderRadius: 30, paddingHorizontal: 25, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 15 }),
     cardContent: { justifyContent: 'center', paddingVertical: 25 },
     titleContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: 15 }),
     backButton: (isRTL) => ({ padding: 5, [isRTL ? 'marginLeft' : 'marginRight']: 10 }),

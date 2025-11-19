@@ -1,4 +1,4 @@
-// SignInScreen.js (الكود الكامل والمعدل)
+// SignInScreen.js (الكود الكامل والنهائي - هذا هو الكود الصحيح)
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -38,6 +38,7 @@ const translations = {
         fillFieldsError: 'الرجاء إدخال البريد الإلكتروني وكلمة المرور.',
         activationRequiredTitle: 'تفعيل الحساب مطلوب',
         activationRequiredMessage: 'يجب عليك تفعيل حسابك أولاً. برجاء التحقق من الرابط الذي تم إرساله إلى بريدك الإلكتروني.',
+        unexpectedError: 'حدث خطأ غير متوقع.',
     },
     en: {
         headerTitle: 'Hello!', headerSubtitle: 'Welcome back', cardTitle: 'Login',
@@ -48,13 +49,14 @@ const translations = {
         fillFieldsError: 'Please enter your email and password.',
         activationRequiredTitle: 'Account Activation Required',
         activationRequiredMessage: 'You must activate your account first. Please check the link sent to your email.',
+        unexpectedError: 'An unexpected error occurred.',
     }
 };
 
-const SignInScreen = ({ navigation }) => {
+const SignInScreen = ({ navigation, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
-    const [language, setLanguage] = useState('en');
-    const [isRTL, setIsRTL] = useState(false);
+    const language = appLanguage || 'en';
+    const isRTL = language === 'ar';
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isPasswordSecure, setIsPasswordSecure] = useState(true);
@@ -66,17 +68,13 @@ const SignInScreen = ({ navigation }) => {
 
     useFocusEffect(
         useCallback(() => {
-            const loadSettings = async () => {
+            const loadTheme = async () => {
                 try {
                     const savedTheme = await AsyncStorage.getItem('isDarkMode');
                     setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
-                    const savedLang = await AsyncStorage.getItem('appLanguage');
-                    const currentLang = savedLang || 'en';
-                    setLanguage(currentLang);
-                    setIsRTL(currentLang === 'ar');
-                } catch (e) { console.error('Failed to load settings.', e); }
+                } catch (e) { console.error('Failed to load theme.', e); }
             };
-            loadSettings();
+            loadTheme();
         }, [])
     );
 
@@ -85,7 +83,6 @@ const SignInScreen = ({ navigation }) => {
         if (englishEmailRegex.test(text)) { setEmail(text); }
     };
     
-    // ✅ --- التعديل الرئيسي هنا --- ✅
     const handleSignIn = async () => {
         if (!email.trim() || !password) {
             Alert.alert(t('errorTitle'), t('fillFieldsError'));
@@ -93,18 +90,13 @@ const SignInScreen = ({ navigation }) => {
         }
         setLoading(true);
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email.toLowerCase(), password: password,
-            });
+            const { data, error } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password: password });
             if (error) { 
                 Alert.alert(t('errorTitle'), error.message); 
             } else if (data?.user) {
                 if (data.user.email_confirmed_at) {
                     const { user } = data;
-                    
-                    // ✨ منطق التحقق
                     const isNewUser = !user.user_metadata?.onboarding_complete;
-                    
                     const profileData = {
                         email: user.email,
                         firstName: user.user_metadata?.firstName || '',
@@ -112,64 +104,41 @@ const SignInScreen = ({ navigation }) => {
                     };
                     await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
                     await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-
-                    if (isNewUser) {
-                        navigation.replace('BasicInfo');
-                    } else {
-                        navigation.replace('MainUI');
-                    }
+                    if (isNewUser) { navigation.replace('BasicInfo'); } else { navigation.replace('MainUI'); }
                 } else {
                     Alert.alert(t('activationRequiredTitle'), t('activationRequiredMessage'));
                 }
             }
         } catch (error) {
-            Alert.alert(t('errorTitle'), 'An unexpected error occurred.');
+            Alert.alert(t('errorTitle'), t('unexpectedError'));
             console.error(error);
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
     
-    // ✅ --- الدالة الموحدة والمعدلة لتسجيل الدخول عبر وسائل التواصل --- ✅
     const handleSocialSignIn = async (provider) => {
         if (provider === 'google') setGoogleLoading(true);
         if (provider === 'facebook') setFacebookLoading(true);
-        
         try {
-            const redirectUri = makeRedirectUri({ scheme: 'calora' }); // تأكد أن scheme صحيح
-            const { data, error } = await supabase.auth.signInWithOAuth({
-                provider: provider,
-                options: { redirectTo: redirectUri },
-            });
-
+            const redirectUri = makeRedirectUri({ scheme: 'calora' }); 
+            const { data, error } = await supabase.auth.signInWithOAuth({ provider: provider, options: { redirectTo: redirectUri } });
             if (error) throw error;
-            
             const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-            
             if (res.type === 'success') {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session) {
                     const { user } = session;
-
-                    // ✨ نفس منطق التحقق
                     const isNewUser = !user.user_metadata?.onboarding_complete;
-                    
                     const userName = user.user_metadata?.full_name || user.user_metadata?.name || '';
                     const [firstName, ...lastNameParts] = userName.split(' ');
                     const lastName = lastNameParts.join(' ').trim();
                     const profileData = { email: user.email, firstName, lastName };
                     await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
                     await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-
-                    if (isNewUser) {
-                        navigation.replace('BasicInfo');
-                    } else {
-                        navigation.replace('MainUI');
-                    }
+                    if (isNewUser) { navigation.replace('BasicInfo'); } else { navigation.replace('MainUI'); }
                 } 
             }
         } catch (error) {
-            Alert.alert(t('errorTitle'), error.message || `An error occurred during ${provider} sign-in.`);
+            Alert.alert(t('errorTitle'), error.message || t('unexpectedError'));
         } finally {
             if (provider === 'google') setGoogleLoading(false);
             if (provider === 'facebook') setFacebookLoading(false);
@@ -184,11 +153,9 @@ const SignInScreen = ({ navigation }) => {
                     <View style={styles.header(theme)}>
                         <Image source={require('./assets/leafshadowcorner.png')} style={styles.headerImageTopLeft(isRTL)} resizeMode="contain" />
                         <Image source={require('./assets/palmleaf3.png')} style={styles.headerImageBottomRight(isRTL)} resizeMode="contain" />
-                        
                         <Text style={styles.title(theme, isRTL)}>{t('headerTitle')}</Text>
                         <Text style={styles.subtitle(theme, isRTL)}>{t('headerSubtitle')}</Text>
                     </View>
-
                     <View style={styles.formContainer}>
                         <View style={styles.card(theme)}>
                             <Text style={styles.loginTitle(theme)}>{t('cardTitle')}</Text>
@@ -238,33 +205,9 @@ const SignInScreen = ({ navigation }) => {
 
 const styles = {
     safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    header: (theme) => ({
-        backgroundColor: theme.primary,
-        height: height * 0.35,
-        borderBottomLeftRadius: 50,
-        borderBottomRightRadius: 50,
-        justifyContent: 'flex-start',
-        paddingHorizontal: 30,
-        paddingTop: 60,
-        position: 'relative',
-        overflow: 'hidden'
-    }),
-    headerImageTopLeft: (isRTL) => ({
-        position: 'absolute',
-        top: -60,
-        ...(isRTL ? { right: -70, transform: [{ scaleX: -1 }] } : { left: -70 }),
-        width: 290,
-        height: 290,
-        opacity: 0.8,
-    }),
-    headerImageBottomRight: (isRTL) => ({
-        position: 'absolute',
-        bottom: -7,
-        ...(isRTL ? { left: 20 } : { right: 20 }),
-        width: 130,
-        height: 130,
-        zIndex: 2,
-    }),
+    header: (theme) => ({ backgroundColor: theme.primary, height: height * 0.35, borderBottomLeftRadius: 50, borderBottomRightRadius: 50, justifyContent: 'flex-start', paddingHorizontal: 30, paddingTop: 60, position: 'relative', overflow: 'hidden' }),
+    headerImageTopLeft: (isRTL) => ({ position: 'absolute', top: -60, ...(isRTL ? { right: -70, transform: [{ scaleX: -1 }] } : { left: -70 }), width: 290, height: 290, opacity: 0.8 }),
+    headerImageBottomRight: (isRTL) => ({ position: 'absolute', bottom: -7, ...(isRTL ? { left: 20 } : { right: 20 }), width: 130, height: 130, zIndex: 2 }),
     title: (theme, isRTL) => ({ fontSize: 42, fontWeight: 'bold', color: theme.headerText, textAlign: isRTL ? 'right' : 'left' }),
     subtitle: (theme, isRTL) => ({ fontSize: 18, color: theme.headerText, marginTop: 5, textAlign: isRTL ? 'right' : 'left' }),
     formContainer: { flex: 1, paddingHorizontal: 20, marginTop: -40, zIndex: 1 },

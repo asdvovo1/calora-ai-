@@ -1,12 +1,13 @@
+// profile.js - الكود الكامل المصحح
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, RefreshControl, Alert } from 'react-native';
+import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, SafeAreaView, StatusBar, RefreshControl, Alert, I18nManager } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabaseclient'; 
 
-// --- الترجمات والثيمات (تبقى كما هي) ---
+// --- الترجمات والثيمات ---
 const translations = {
   en: { newUser: 'New User', editProfile: 'Edit Profile', settings: 'Settings', about: 'About', logout: 'Logout', logoutErrorTitle: 'Error', logoutErrorMessage: 'An error occurred while logging out.' },
   ar: { newUser: 'مستخدم جديد', editProfile: 'تعديل الملف الشخصي', settings: 'الإعدادات', about: 'حول التطبيق', logout: 'تسجيل الخروج', logoutErrorTitle: 'خطأ', logoutErrorMessage: 'حدث خطأ أثناء تسجيل الخروج.' },
@@ -14,14 +15,15 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', primaryText: '#1C1C1E', secondaryText: '#8A8A8E', separator: '#E5E5EA', logout: '#FF3B30', statusBar: 'dark-content', borderColor: '#FFFFFF' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', primaryText: '#FFFFFF', secondaryText: '#A5A5A5', separator: '#38383A', logout: '#EF5350', statusBar: 'light-content', borderColor: '#1E1E1E' };
 
-// ✅✅✅ [الإصلاح الرئيسي هنا]: تم تعديل المكون والـ Style بتاعه ✅✅✅
-const SettingsItem = ({ icon, name, onPress, color, theme, isRTL }) => (
+// ✅ تم التعديل: الاعتماد على Flexbox الطبيعي و marginStart/End
+const SettingsItem = ({ icon, name, onPress, color, theme }) => (
     <TouchableOpacity style={styles.settingsItem(theme)} onPress={onPress}>
-      <View style={[styles.settingsItemContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={styles.settingsItemIcon(isRTL)}>{icon}</View>
+      <View style={styles.settingsItemContent}>
+        <View style={styles.settingsItemIcon}>{icon}</View>
         <Text style={[styles.settingsItemText(theme), { color: color || theme.primaryText }]}>{name}</Text>
       </View>
-      <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
+      {/* الأيقونة فقط هي التي تحتاج شرط لأنها لا تنقلب تلقائياً */}
+      <Icon name={I18nManager.isRTL ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
     </TouchableOpacity>
 );
 
@@ -30,16 +32,23 @@ const ProfileScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState('ar');
 
   const theme = isDarkMode ? darkTheme : lightTheme;
-  const isRTL = language === 'ar';
+  // ملاحظة: لم نعد بحاجة لمتغير isRTL للتحكم في الستايل، النظام يقوم بذلك
   const t = (key) => translations[language]?.[key] || translations['en'][key];
 
   const loadScreenData = useCallback(async () => {
     try {
       const userJson = await AsyncStorage.getItem('userProfile');
-      if (userJson) setUserData(JSON.parse(userJson));
+      if (userJson) {
+        const parsedData = JSON.parse(userJson);
+        setUserData({
+            firstName: parsedData.firstName || parsedData.first_name,
+            lastName: parsedData.lastName || parsedData.last_name,
+            profileImage: parsedData.profileImage || parsedData.profile_image_url
+        });
+      }
 
       const themeValue = await AsyncStorage.getItem('isDarkMode');
       setIsDarkMode(themeValue === 'true');
@@ -69,21 +78,27 @@ const ProfileScreen = () => {
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      
       if (error) {
-        Alert.alert('Logout Error', error.message);
+        Alert.alert(t('logoutErrorTitle'), error.message);
         return; 
       }
-      
+      await AsyncStorage.clear();
       navigation.reset({
         index: 0,
         routes: [{ name: 'Index' }],
       });
-
     } catch (e) {
       console.error("Logout failed", e);
       Alert.alert(t('logoutErrorTitle'), t('logoutErrorMessage'));
     }
+  };
+
+  const getDisplayName = () => {
+    const { firstName, lastName } = userData;
+    if (firstName && lastName) return `${firstName} ${lastName}`;
+    if (firstName) return firstName;
+    if (lastName) return lastName;
+    return t('newUser');
   };
 
   return (
@@ -91,7 +106,7 @@ const ProfileScreen = () => {
       <StatusBar barStyle={theme.statusBar} />
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primaryText} />}
       >
         <View style={styles.header}>
             <Image
@@ -107,19 +122,19 @@ const ProfileScreen = () => {
             style={styles.profileImage(theme)}
           />
           <Text style={styles.profileName(theme)}>
-            {userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}` : t('newUser')}
+            {getDisplayName()}
           </Text>
         </View>
         <View style={styles.menuContainer}>
           <View style={styles.menuSection(theme)}>
-            <SettingsItem icon={<Icon name="user" size={22} color={theme.secondaryText} />} name={t('editProfile')} onPress={() => navigation.navigate('EditProfile')} theme={theme} isRTL={isRTL}/>
+            <SettingsItem icon={<Icon name="user" size={22} color={theme.secondaryText} />} name={t('editProfile')} onPress={() => navigation.navigate('EditProfile')} theme={theme} />
             <View style={styles.separator(theme)} />
-            <SettingsItem icon={<Ionicons name="settings-outline" size={22} color={theme.secondaryText} />} name={t('settings')} onPress={() => navigation.navigate('Settings')} theme={theme} isRTL={isRTL} />
+            <SettingsItem icon={<Ionicons name="settings-outline" size={22} color={theme.secondaryText} />} name={t('settings')} onPress={() => navigation.navigate('Settings')} theme={theme} />
           </View>
           <View style={styles.menuSection(theme)}>
-            <SettingsItem icon={<Icon name="info" size={22} color={theme.secondaryText} />} name={t('about')} onPress={() => navigation.navigate('About')} theme={theme} isRTL={isRTL} />
+            <SettingsItem icon={<Icon name="info" size={22} color={theme.secondaryText} />} name={t('about')} onPress={() => navigation.navigate('About')} theme={theme} />
             <View style={styles.separator(theme)} />
-            <SettingsItem icon={<Ionicons name="log-out-outline" size={24} color={theme.logout} />} name={t('logout')} onPress={handleLogout} color={theme.logout} theme={theme} isRTL={isRTL} />
+            <SettingsItem icon={<Ionicons name="log-out-outline" size={24} color={theme.logout} />} name={t('logout')} onPress={handleLogout} color={theme.logout} theme={theme} />
           </View>
         </View>
       </ScrollView>
@@ -127,7 +142,6 @@ const ProfileScreen = () => {
   );
 };
 
-// --- الأنماط بعد التعديل ---
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
   header: { height: 200, overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, },
@@ -138,34 +152,18 @@ const styles = {
   menuContainer: { paddingHorizontal: 20, marginTop: 40 },
   menuSection: (theme) => ({ backgroundColor: theme.surface, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }),
   
-  // ✅✅✅ [الإصلاح الرئيسي هنا]: تم تعديل الـ Style الخاص بالعنصر ✅✅✅
-  settingsItem: (theme) => ({ 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 15, 
-    paddingVertical: 15 
-  }),
-  settingsItemContent: { 
-    alignItems: 'center', 
-    flex: 1 
-  },
-  settingsItemIcon: (isRTL) => ({
-    // هنا بنحدد الهامش بناءً على اللغة
-    marginRight: isRTL ? 0 : 15,
-    marginLeft: isRTL ? 15 : 0,
-  }),
-  settingsItemText: (theme) => ({ 
-    fontSize: 17, 
-    color: theme.primaryText 
-  }),
-  separator: (theme) => ({ 
-    height: StyleSheet.hairlineWidth, 
-    backgroundColor: theme.separator, 
-    // بنخلي الفاصل يبدأ من بعد مكان الأيقونة
-    marginLeft: 54,
-    marginRight: 54 // نضيف دي احتياطي عشان لو الشاشة اتعكست
-  }),
+  // ✅ تم التعديل هنا: flexDirection 'row' دائماً
+  settingsItem: (theme) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 15 }),
+  settingsItemContent: { alignItems: 'center', flex: 1, flexDirection: 'row' },
+  
+  // ✅ تم التعديل: استخدام marginEnd بدلاً من الشروط المعقدة
+  settingsItemIcon: { marginEnd: 15 }, 
+  
+  // ✅ تم التعديل: محاذاة النص لليسار (البداية) دائماً
+  settingsItemText: (theme) => ({ fontSize: 17, color: theme.primaryText, textAlign: 'left' }),
+  
+  // ✅ تم التعديل: استخدام marginStart
+  separator: (theme) => ({ height: StyleSheet.hairlineWidth, backgroundColor: theme.separator, marginStart: 54, }),
 };
 
 export default ProfileScreen;

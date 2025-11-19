@@ -1,32 +1,20 @@
-// measurements.js (معدّل لاستخدام @react-native-community/slider)
+// measurements.js (الكود الكامل والنهائي)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-} from 'react-native';
-// ✅✅✅ الخطوة 1: استيراد المكتبة البديلة ✅✅✅
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar,
+} from 'react-native'; 
 import Slider from '@react-native-community/slider'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
-// ===================================================================
-// --- الثيمات والترجمات (لا تغيير) ---
-// ===================================================================
 const lightTheme = { primary: '#388E3C', textAndIcons: '#2E7D32', background: '#F9FBFA', white: '#FFFFFF', cardBorder: '#EFF2F1', grayText: '#888888', disabled: '#A5D6A7', progressBarBg: '#E8F5E9', bubbleBg: '#E8F5E9', sliderMaxTrack: '#D1E7D3', statusBar: 'dark-content' };
 const darkTheme = { primary: '#66BB6A', textAndIcons: '#AED581', background: '#121212', white: '#1E1E1E', cardBorder: '#272727', grayText: '#B0B0B0', disabled: '#4CAF50', progressBarBg: '#333333', bubbleBg: '#37474F', sliderMaxTrack: '#37474F', statusBar: 'light-content' };
 const translations = { en: { title: "What Are Your Measurements?", subtitle: "Don't worry, this information is private and helps us set your starting point.", heightLabel: "Height", heightUnit: "cm", weightLabel: "Current Weight", weightUnit: "kg", nextButton: "Next" }, ar: { title: "ما هي قياساتك الحالية؟", subtitle: "لا تقلق، هذه المعلومات خاصة بك وحدك وتساعدنا في تحديد نقطة البداية.", heightLabel: "الطول", heightUnit: "سم", weightLabel: "الوزن الحالي", weightUnit: "كجم", nextButton: "التالي" } };
 
-// ===================================================================
-// --- المكونات المساعدة (تعديل بسيط في MeasurementSlider) ---
-// ===================================================================
 const ProgressBar = ({ step, totalSteps, theme }) => ( <View style={styles.progressBarContainer(theme)}><View style={[styles.progressBar(theme), { width: `${(step / totalSteps) * 100}%` }]} /></View> );
 const PrimaryButton = ({ title, onPress, disabled = false, theme }) => ( <TouchableOpacity style={[styles.button(theme), disabled ? styles.buttonDisabled(theme) : styles.buttonEnabled(theme)]} onPress={onPress} disabled={disabled} activeOpacity={0.7}><Text style={styles.buttonText(theme)}>{title}</Text></TouchableOpacity> );
 const ScreenHeader = ({ title, subtitle, theme }) => ( <View style={styles.headerContainer}><Text style={styles.title(theme)}>{title}</Text><Text style={styles.subtitle(theme)}>{subtitle}</Text></View> );
-
 const MeasurementSlider = ({ label, unit, value, onValueChange, min, max, step, theme, isRTL }) => (
   <View style={styles.sliderComponentContainer}>
     <View style={styles.sliderLabelContainer(isRTL)}>
@@ -39,26 +27,42 @@ const MeasurementSlider = ({ label, unit, value, onValueChange, min, max, step, 
     <Slider
       style={styles.sliderStyle}
       minimumValue={min} maximumValue={max} step={step} value={value} 
-      // ✅✅✅ الخطوة 2: تعديل بسيط هنا ✅✅✅
-      onValueChange={onValueChange} // لا نحتاج لـ newValue[0] هنا
+      onValueChange={onValueChange}
       minimumTrackTintColor={theme.primary} maximumTrackTintColor={theme.sliderMaxTrack} thumbTintColor={theme.primary}
     />
   </View>
 );
 
-// ===================================================================
-// --- شاشة القياسات (لا تغيير هنا) ---
-// ===================================================================
-const MeasurementsScreen = ({ navigation, route }) => {
+// 🔧 --- التعديل هنا: استقبال appLanguage --- 🔧
+const MeasurementsScreen = ({ navigation, route, appLanguage }) => {
   const [height, setHeight] = useState(170);
   const [weight, setWeight] = useState(70.0);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [language, setLanguage] = useState('ar');
+
+  // ✅ نستخدم اللغة القادمة من App.js مباشرة
+  const language = appLanguage || 'en';
   const theme = isDarkMode ? darkTheme : lightTheme;
   const isRTL = language === 'ar';
   const t = (key) => translations[language]?.[key] || translations['en'][key];
-  useEffect(() => { const loadSettings = async () => { const darkMode = await AsyncStorage.getItem('isDarkMode'); setIsDarkMode(darkMode === 'true'); const lang = await AsyncStorage.getItem('appLanguage'); if (lang) setLanguage(lang); }; loadSettings(); }, []);
-  const handleNextPress = () => { const collectedData = { ...(route?.params || {}), height: Math.round(height), weight: parseFloat(weight.toFixed(1)), }; navigation.navigate('Goal', collectedData); };
+
+  // 🔧 --- التعديل هنا: هذا الـ Hook الآن فقط للـ Theme --- 🔧
+  useFocusEffect(
+    useCallback(() => {
+        const loadTheme = async () => {
+            try {
+                const darkMode = await AsyncStorage.getItem('isDarkMode');
+                setIsDarkMode(darkMode === 'true');
+            } catch (e) { console.error('Failed to load theme.', e); }
+        };
+        loadTheme();
+    }, [])
+  );
+
+  const handleNextPress = () => { 
+    const collectedData = { ...(route?.params || {}), height: Math.round(height), weight: parseFloat(weight.toFixed(1)) }; 
+    navigation.navigate('Goal', collectedData); 
+  };
+
   return (
     <SafeAreaView style={styles.safeArea(theme)}>
       <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
@@ -77,9 +81,6 @@ const MeasurementsScreen = ({ navigation, route }) => {
   );
 };
 
-// ===================================================================
-// --- الأنماط (لا تغيير) ---
-// ===================================================================
 const styles = {
   safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
   container: { flex: 1, padding: 24, justifyContent: 'space-between' },

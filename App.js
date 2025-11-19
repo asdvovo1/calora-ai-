@@ -1,21 +1,21 @@
-// App.js (النسخة النهائية الكاملة والمعدلة)
-
 import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 import 'react-native-gesture-handler';
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, I18nManager } from 'react-native'; // <--- تم إضافة I18nManager
+import { View, StyleSheet, I18nManager, DevSettings } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { supabase } from './supabaseclient'; 
-import * as Linking from 'expo-linking'; 
-import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- تم إضافة AsyncStorage
+import { supabase } from './supabaseclient';
+import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// --- استيراد الشاشات ---
-import SplashScreen from './Splash';
-import IndexScreen from './Index'; 
+// --- استيراد شاشتك المخصصة (هذا صحيح الآن) ---
+import SplashScreen from './Splash'; 
+
+// --- استيراد باقي الشاشات ---
+import IndexScreen from './Index';
 import SignInScreen from './signin';
 import SignUpScreen from './signup';
 import ForgotPasswordScreen from './forgotpassword';
@@ -26,75 +26,90 @@ import MeasurementsScreen from './measurements';
 import GoalScreen from './goal';
 import ActivityLevelScreen from './activitylevel';
 import ResultsScreen from './results';
-import MainUI from './mainui'; 
+import MainUI from './mainui';
+import SettingsScreen from './setting';
 
 const Stack = createStackNavigator();
 
 const App = () => {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
-  const [appLanguage, setAppLanguage] = useState('en'); // <--- 1. أضفنا حالة اللغة هنا
+  const [appLanguage, setAppLanguage] = useState('en');
+  const [appIsReady, setAppIsReady] = useState(false); // هذا سيتحكم في عرض شاشتك المخصصة
 
-  // دالة التعامل مع الروابط العميقة (للمصادقة عبر OAuth)
-  const handleDeepLink = (url) => {
+  const handleDeepLink = async (url) => {
     if (!url) return;
     const params = url.split('#')[1];
     if (params) {
-      const parsedParams = params.split('&').reduce((acc, part) => {
-        const [key, value] = part.split('=');
-        acc[decodeURIComponent(key)] = decodeURIComponent(value);
-        return acc;
-      }, {});
-      const { access_token, refresh_token } = parsedParams;
-      if (access_token && refresh_token) {
-        supabase.auth.setSession({ access_token, refresh_token }).then(({ data }) => {
-           setSession(data.session);
-        });
-      }
+        const parsedParams = params.split('&').reduce((acc, part) => {
+            const [key, value] = part.split('=');
+            acc[decodeURIComponent(key)] = decodeURIComponent(value);
+            return acc;
+        }, {});
+
+        if (parsedParams.access_token && parsedParams.refresh_token) {
+            await supabase.auth.setSession({
+                access_token: parsedParams.access_token,
+                refresh_token: parsedParams.refresh_token,
+            });
+        }
     }
   };
 
   useEffect(() => {
     const initializeApp = async () => {
-      // --- 2. أضفنا كود تحميل اللغة ---
       try {
         const savedLang = await AsyncStorage.getItem('appLanguage');
-        if (savedLang) {
-          setAppLanguage(savedLang);
-          I18nManager.forceRTL(savedLang === 'ar'); // تطبيق اتجاه اللغة فورًا
+        const currentLang = savedLang || 'en';
+        const isRTLRequired = currentLang === 'ar';
+
+        if (I18nManager.isRTL !== isRTLRequired) {
+          I18nManager.forceRTL(isRTLRequired);
+          DevSettings.reload();
+          return;
         }
+
+        setAppLanguage(currentLang);
+
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+
+        if (currentSession?.user) {
+          setIsOnboardingComplete(currentSession.user.user_metadata?.onboarding_complete || false);
+        }
+
       } catch (e) {
-        console.log('Failed to load language.');
+        console.warn('Initialization error:', e);
+      } finally {
+        // بعد انتهاء التحميل، انتظر قليلاً لعرض شاشتك المخصصة ثم اعرض التطبيق
+        setTimeout(() => {
+          setAppIsReady(true);
+        }, 2500); // <-- مدة عرض شاشتك المخصصة من ملف Splash.js
       }
-      
-      // جلب الجلسة عند بدء تشغيل التطبيق (كودك الأصلي)
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setIsOnboardingComplete(session?.user?.user_metadata?.onboarding_complete || false);
-        setTimeout(() => setLoading(false), 2000); 
-      });
     };
 
     initializeApp();
 
-    // الاستماع لأي تغيير في حالة تسجيل الدخول/الخروج
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setIsOnboardingComplete(session?.user?.user_metadata?.onboarding_complete || false);
+      if (session?.user) {
+        setIsOnboardingComplete(session.user.user_metadata?.onboarding_complete || false);
+      } else {
+        setIsOnboardingComplete(false);
+      }
     });
-    
-    // التعامل مع الروابط العميقة
+
     const linkSubscription = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
     Linking.getInitialURL().then(url => handleDeepLink(url));
-    
+
     return () => {
       subscription.unsubscribe();
       linkSubscription.remove();
     };
   }, []);
 
-  if (loading) {
+  // هذا الكود صحيح: يعرض شاشتك المخصصة طالما التطبيق ليس جاهزاً
+  if (!appIsReady) {
     return <SplashScreen />;
   }
 
@@ -109,27 +124,47 @@ const App = () => {
     <SafeAreaProvider>
       <View style={styles.rootContainer}>
         <NavigationContainer>
-          <Stack.Navigator 
-            initialRouteName={getInitialRouteName()} 
+          <Stack.Navigator
+            initialRouteName={getInitialRouteName()}
             screenOptions={{ headerShown: false }}
           >
-            {/* المستخدم غير مسجل دخول */}
-            <Stack.Screen name="Index" component={IndexScreen} />
-            <Stack.Screen name="SignIn" component={SignInScreen} />
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
-            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
-            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-            
-            {/* المستخدم مسجل ولكن لم يكمل الإعداد */}
-            <Stack.Screen name="BasicInfo" component={BasicInfoScreen} />
-            <Stack.Screen name="Measurements" component={MeasurementsScreen} />
-            <Stack.Screen name="Goal" component={GoalScreen} />
-            <Stack.Screen name="ActivityLevel" component={ActivityLevelScreen} />
-            <Stack.Screen name="Results" component={ResultsScreen} />
-            
-            {/* المستخدم مسجل وأكمل الإعداد */}
-            {/* --- 3. تعديل طريقة استدعاء MainUI لتمرير اللغة --- */}
+            {/* باقي الشاشات كما هي */}
+            <Stack.Screen name="Index">
+              {(props) => <IndexScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="SignIn">
+              {(props) => <SignInScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="SignUp">
+              {(props) => <SignUpScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="ForgotPassword">
+              {(props) => <ForgotPasswordScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="EmailVerification">
+              {(props) => <EmailVerificationScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="ResetPassword">
+              {(props) => <ResetPasswordScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="BasicInfo">
+              {(props) => <BasicInfoScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="Measurements">
+              {(props) => <MeasurementsScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="Goal">
+              {(props) => <GoalScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="ActivityLevel">
+              {(props) => <ActivityLevelScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="Results">
+              {(props) => <ResultsScreen {...props} appLanguage={appLanguage} />}
+            </Stack.Screen>
+            <Stack.Screen name="Settings">
+              {(props) => <SettingsScreen {...props} onThemeChange={async (isDark) => { await AsyncStorage.setItem('isDarkMode', String(isDark)); }} />}
+            </Stack.Screen>
             <Stack.Screen name="MainUI">
               {(props) => <MainUI {...props} appLanguage={appLanguage} />}
             </Stack.Screen>

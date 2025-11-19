@@ -1,9 +1,7 @@
-// In IndexScreen.js (الكود الكامل والنهائي والمعدل)
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Image, Dimensions,
-  TouchableOpacity, StatusBar, SafeAreaView, Animated,
+  TouchableOpacity, StatusBar, SafeAreaView, Animated, I18nManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,23 +12,13 @@ const { width, height } = Dimensions.get('window');
 // ===== الثيمات والترجمات (بدون تغيير) =====
 // ==========================================================
 const lightTheme = {
-    background: '#F6FEF6',
-    primary: '#4CAF50',
-    text: '#333333',
-    inactive: '#A5D6A7',
-    white: '#FFFFFF',
-    statusBar: 'dark-content',
+    background: '#F6FEF6', primary: '#4CAF50', text: '#333333',
+    inactive: '#A5D6A7', white: '#FFFFFF', statusBar: 'dark-content',
 };
-
 const darkTheme = {
-    background: '#121212',
-    primary: '#66BB6A',
-    text: '#E0E0E0',
-    inactive: '#424242',
-    white: '#1E1E1E',
-    statusBar: 'light-content',
+    background: '#121212', primary: '#66BB6A', text: '#E0E0E0',
+    inactive: '#424242', white: '#1E1E1E', statusBar: 'light-content',
 };
-
 const translations = {
     ar: {
         cameraTitle: 'الكاميرا هي أخصائي التغذية الخاص بك',
@@ -39,9 +27,7 @@ const translations = {
         accuracyDesc: 'هل سئمت من التطبيقات التي لا تتعرف على أطباقك المحلية المفضلة؟ الذكاء الاصطناعي لدينا مدرب خصيصًا على المطبخ المصري والشرق أوسطي ليمنحك معلومات غذائية تثق بها.',
         resultsTitle: 'حوّل المعرفة إلى نتائج',
         resultsDesc: 'حدد أهدافك، تتبع تقدمك برسوم بيانية واضحة، واتخذ خيارات غذائية أذكى كل يوم. رحلتك الصحية لم تكن بهذه البساطة والوضوح من قبل.',
-        nextButton: 'التالي',
-        signInButton: 'تسجيل الدخول',
-        signUpButton: 'إنشاء حساب',
+        nextButton: 'التالي', signInButton: 'تسجيل الدخول', signUpButton: 'إنشاء حساب',
     },
     en: {
         cameraTitle: 'Your Camera is Your Nutritionist',
@@ -50,58 +36,59 @@ const translations = {
         accuracyDesc: 'Tired of apps that don’t recognize your favorite local dishes? Our AI is specially trained on Egyptian & Middle Eastern cuisine to give you nutritional info you can trust.',
         resultsTitle: 'Turn Knowledge into Results',
         resultsDesc: 'Set your goals, track your progress with clear charts, and make smarter food choices every day. Your health journey has never been this simple and clear.',
-        nextButton: 'Next',
-        signInButton: 'Sign In',
-        signUpButton: 'Sign Up',
+        nextButton: 'Next', signInButton: 'Sign In', signUpButton: 'Sign Up',
     }
 };
-
 const slidesContent = [
     { id: '1', image: require('./assets/scan.png'), titleKey: 'cameraTitle', descriptionKey: 'cameraDesc' },
     { id: '2', image: require('./assets/calorie.png'), titleKey: 'accuracyTitle', descriptionKey: 'accuracyDesc' },
     { id: '3', image: require('./assets/goal.png'), titleKey: 'resultsTitle', descriptionKey: 'resultsDesc' }
 ];
+const getItemLayout = (_, index) => ({ length: width, offset: width * index, index });
 
-const getItemLayout = (data, index) => ({ length: width, offset: width * index, index });
-
-const IndexScreen = ({ navigation, route }) => {
+const IndexScreen = ({ navigation, route, appLanguage }) => {
     const [theme, setTheme] = useState(lightTheme);
-    const [language, setLanguage] = useState('en');
-    const [isRTL, setIsRTL] = useState(false);
+    const language = appLanguage; 
+    const isRTL = language === 'ar';
     
     const [currentIndex, setCurrentIndex] = useState(0);
     const slidesRef = useRef(null);
     const scrollX = useRef(new Animated.Value(0)).current;
 
+    // ✅ الخطوة 1: نضيف state جديد لتتبع حالة الـ layout
+    const [isListReady, setIsListReady] = useState(false);
+
     const t = (key) => translations[language]?.[key] || key;
 
+    useEffect(() => {
+        const loadTheme = async () => {
+            try {
+                const savedTheme = await AsyncStorage.getItem('isDarkMode');
+                setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
+            } catch (e) {
+                console.error('Failed to load theme.', e);
+            }
+        };
+        loadTheme();
+    }, []);
+    
+    // ✅ الخطوة 2: تعديل useFocusEffect ليعيد تعيين الحالة فقط عند التركيز على الشاشة
     useFocusEffect(
         useCallback(() => {
-            const loadSettings = async () => {
-                try {
-                    const savedTheme = await AsyncStorage.getItem('isDarkMode');
-                    setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
-
-                    const savedLang = await AsyncStorage.getItem('appLanguage');
-                    const currentLang = savedLang || 'en';
-                    setLanguage(currentLang);
-                    setIsRTL(currentLang === 'ar');
-                } catch (e) {
-                    console.error('Failed to load settings from storage.', e);
-                }
-            };
-            loadSettings();
+            // نعيد تعيين كل شيء عند العودة لهذه الشاشة
+            scrollX.setValue(0);
+            setCurrentIndex(0);
+            setIsListReady(false); // مهم جداً: نعيد تعيين حالة الجاهزية
         }, [])
     );
-    
+
+    // ✅ الخطوة 3: نستخدم useEffect جديد لينتظر حتى تصبح القائمة جاهزة ثم يقوم بالتمرير
     useEffect(() => {
-        const initialIndex = route.params?.initialSlideIndex;
-        if (initialIndex !== undefined && slidesRef.current) {
-            setTimeout(() => {
-                slidesRef.current.scrollToIndex({ index: initialIndex, animated: false });
-            }, 100);
+        // هذا الكود لن يعمل إلا بعد أن يتم استدعاء onLayout وتصبح isListReady = true
+        if (isListReady && slidesRef.current) {
+            slidesRef.current.scrollToIndex({ index: 0, animated: false });
         }
-    }, [route.params?.initialSlideIndex]);
+    }, [isListReady]); // نراقب التغيير في حالة جاهزية القائمة
 
     const onViewableItemsChanged = useRef(({ viewableItems }) => {
         if (viewableItems.length > 0) {
@@ -110,13 +97,15 @@ const IndexScreen = ({ navigation, route }) => {
     }).current;
     const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
     
-    // ✅✅✅  الإصلاح رقم 2: هنا تم حل مشكلة زر "التالي" ✅✅✅
-    const handleNextPress = useCallback(() => {
+    const handleNextPress = () => {
         const nextSlideIndex = currentIndex + 1;
         if (nextSlideIndex < slidesContent.length && slidesRef.current) {
-            slidesRef.current.scrollToIndex({ index: nextSlideIndex });
+            // التأخير هنا لا يزال مفيدًا لتجنب أي مشاكل عند الضغط السريع
+            setTimeout(() => {
+                slidesRef.current?.scrollToIndex({ index: nextSlideIndex });
+            }, 50); 
         }
-    }, [currentIndex]); // أضفنا currentIndex هنا لتحديث الدالة دائمًا
+    };
     
     const slides = slidesContent.map(slide => ({
         ...slide,
@@ -151,6 +140,9 @@ const IndexScreen = ({ navigation, route }) => {
                         [{ nativeEvent: { contentOffset: { x: scrollX } } }],
                         { useNativeDriver: false }
                     )}
+                    // ✅ الخطوة 4: نضيف onLayout إلى FlatList لتحديث الحالة عند اكتمال الرسم
+                    onLayout={() => setIsListReady(true)}
+                    inverted={isRTL} 
                 />
             </View>
 
@@ -158,7 +150,8 @@ const IndexScreen = ({ navigation, route }) => {
                 <View>
                     <View style={styles.paginatorContainer(isRTL)}>
                         {slides.map((_, i) => {
-                            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+                            const itemIndex = isRTL ? slides.length - 1 - i : i;
+                            const inputRange = [(itemIndex - 1) * width, itemIndex * width, (itemIndex + 1) * width];
                             const dotWidth = scrollX.interpolate({ inputRange, outputRange: [8, 25, 8], extrapolate: 'clamp' });
                             const opacity = scrollX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
                             return <Animated.View key={i.toString()} style={[styles.dot(theme), { width: dotWidth, opacity }]} />;
@@ -194,126 +187,26 @@ const IndexScreen = ({ navigation, route }) => {
     );
 };
 
-// ==========================================================
-// ===== الأنماط =====
-// ==========================================================
+// ... الأنماط (styles) تبقى كما هي بدون أي تغيير
 const styles = {
-    container: (theme) => ({
-        flex: 1,
-        backgroundColor: theme.background,
-    }),
-    topContainer: (theme) => ({
-        height: height * 0.52,
-        backgroundColor: theme.background,
-        borderBottomLeftRadius: 80,
-        borderBottomRightRadius: 80,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        elevation: 8,
-        overflow: 'hidden',
-    }),
-    slideItem: {
-        width: width,
-        height: '100%',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        paddingBottom: 40,
-    },
-    image: {
-        width: width * 0.75,
-        height: height * 0.4,
-    },
-    bottomContainer: (theme, isRTL) => ({
-        flex: 1,
-        paddingHorizontal: 30,
-        paddingTop: 30,
-        paddingBottom: 15,
-        backgroundColor: theme.background,
-        justifyContent: 'space-between', 
-    }),
-    title: (theme, isRTL) => ({
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: theme.text,
-        textAlign: isRTL ? 'right' : 'left',
-        marginBottom: 12,
-    }),
-    description: (theme, isRTL) => ({
-        fontSize: 13,
-        color: theme.text,
-        textAlign: isRTL ? 'right' : 'left',
-        lineHeight: 20,
-        opacity: 0.7,
-    }),
-    // ✅✅✅  الإصلاح رقم 1: هنا تم حل مشكلة النقاط ✅✅✅
-    paginatorContainer: (isRTL) => ({
-        flexDirection: 'row', // نجعلها دائماً row
-        justifyContent: isRTL ? 'flex-end' : 'flex-start', // نحدد المحاذاة بناءً على اللغة
-        marginBottom: 25,
-    }),
-    dot: (theme) => ({
-        height: 8,
-        borderRadius: 4,
-        marginHorizontal: 4,
-        backgroundColor: theme.primary,
-    }),
-    button: (theme) => ({
-        backgroundColor: theme.white,
-        borderRadius: 50,
-        paddingVertical: 18,
-        width: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-    }),
-    buttonText: (theme) => ({
-        fontSize: 16,
-        fontWeight: '600',
-        color: theme.text,
-    }),
-    authButtonsContainer: (isRTL) => ({
-        flexDirection: isRTL ? 'row-reverse' : 'row',
-        width: '100%',
-        justifyContent: 'space-between',
-        gap: 15,
-        marginTop: 20,
-    }),
-    authButton: (specificStyles) => ({
-        flex: 1,
-        paddingVertical: 16,
-        borderRadius: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...specificStyles,
-    }),
-    signInButton: (theme) => ({
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderColor: theme.primary,
-    }),
-    signUpButton: (theme) => ({
-        backgroundColor: theme.primary,
-        elevation: 5,
-        shadowColor: theme.primary,
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-    }),
-    authButtonText: (specificStyles) => ({
-        fontSize: 16,
-        fontWeight: '600',
-        ...specificStyles,
-    }),
-    signInButtonText: (theme) => ({
-        color: theme.primary,
-    }),
-    signUpButtonText: (theme) => ({
-        color: theme.white,
-    }),
+    container: (theme) => ({ flex: 1, backgroundColor: theme.background, }),
+    topContainer: (theme) => ({ height: height * 0.52, backgroundColor: theme.background, borderBottomLeftRadius: 80, borderBottomRightRadius: 80, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 8, overflow: 'hidden', }),
+    slideItem: { width: width, height: '100%', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 40, },
+    image: { width: width * 0.75, height: height * 0.4, },
+    bottomContainer: (theme, isRTL) => ({ flex: 1, paddingHorizontal: 30, paddingTop: 30, paddingBottom: 15, backgroundColor: theme.background, justifyContent: 'space-between',  }),
+    title: (theme, isRTL) => ({ fontSize: 28, fontWeight: 'bold', color: theme.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 12, }),
+    description: (theme, isRTL) => ({ fontSize: 13, color: theme.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 20, opacity: 0.7, }),
+    paginatorContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-start', marginBottom: 25, }),
+    dot: (theme) => ({ height: 8, borderRadius: 4, marginHorizontal: 4, backgroundColor: theme.primary, }),
+    button: (theme) => ({ backgroundColor: theme.white, borderRadius: 50, paddingVertical: 18, width: '100%', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, }),
+    buttonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.text, }),
+    authButtonsContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', width: '100%', justifyContent: 'space-between', gap: 15, marginTop: 20, }),
+    authButton: (specificStyles) => ({ flex: 1, paddingVertical: 16, borderRadius: 50, alignItems: 'center', justifyContent: 'center', ...specificStyles, }),
+    signInButton: (theme) => ({ backgroundColor: 'transparent', borderWidth: 1.5, borderColor: theme.primary, }),
+    signUpButton: (theme) => ({ backgroundColor: theme.primary, elevation: 5, shadowColor: theme.primary, shadowOpacity: 0.3, shadowRadius: 5, }),
+    authButtonText: (specificStyles) => ({ fontSize: 16, fontWeight: '600', ...specificStyles, }),
+    signInButtonText: (theme) => ({ color: theme.primary, }),
+    signUpButtonText: (theme) => ({ color: theme.white, }),
 };
 
 export default IndexScreen;

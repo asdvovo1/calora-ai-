@@ -1,5 +1,5 @@
-// WorkoutLogScreen.js - الكود الكامل بالربط الفعلي
-import React, { useState, useEffect } from 'react';
+// WorkoutLogScreen.js - الكود الكامل والمعدل
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     StyleSheet, View, Text, SafeAreaView, TouchableOpacity,
     TextInput, FlatList, Alert, Modal, StatusBar, ActivityIndicator
@@ -7,9 +7,8 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-// ✅ *** REAL GOOGLE FIT INTEGRATION ***: استيراد المكتبة
 import GoogleFit from 'react-native-google-fit';
-
+import { supabase } from './supabaseclient'; // <-- استيراد Supabase
 
 const wlLightTheme = { primary: '#388E3C', background: '#E8F5E9', card: '#FFFFFF', textPrimary: '#212121', textSecondary: '#757575', disabled: '#BDBDBD', inputBackground: '#F5F5F5', overlay: 'rgba(0,0,0,0.5)', statusBar: 'dark-content', cancelButton: '#eee', cancelButtonText: '#212121', iconContainer: '#C8E6C9', white: '#FFFFFF', };
 const wlDarkTheme = { primary: '#66BB6A', background: '#121212', card: '#1E1E1E', textPrimary: '#FFFFFF', textSecondary: '#B0B0B0', disabled: '#424242', inputBackground: '#2C2C2C', overlay: 'rgba(0,0,0,0.7)', statusBar: 'light-content', cancelButton: '#333333', cancelButtonText: '#FFFFFF', iconContainer: '#2E7D32', white: '#FFFFFF', };
@@ -66,9 +65,47 @@ function WorkoutLogScreen({ route, navigation }) {
     const [isGFConnected, setIsGFConnected] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
+    // ✅ ===== دالة تحميل البيانات (معدلة) ===== ✅
+    const loadCustomExercises = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { // إذا لم يكن هناك مستخدم، حمل من الذاكرة المحلية كخطة بديلة
+                const customExercisesJson = await AsyncStorage.getItem('custom_exercises');
+                const localCustom = customExercisesJson ? JSON.parse(customExercisesJson) : [];
+                setExerciseList([...WL_BASE_EXERCISES, ...localCustom]);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('custom_exercises')
+                .select('*')
+                .eq('user_id', user.id);
+            
+            if (error) throw error;
+            
+            const formattedCustomExercises = data.map(item => ({
+                id: `custom_${item.id}`,
+                name: { en: item.name, ar: item.name },
+                icon: item.icon,
+                met: item.met_value,
+                isCustom: true
+            }));
+
+            // دمج التمارين الأساسية مع التمارين المخصصة من السحابة
+            setExerciseList([...WL_BASE_EXERCISES, ...formattedCustomExercises]);
+            // تخزين نسخة محلية
+            await AsyncStorage.setItem('custom_exercises', JSON.stringify(formattedCustomExercises));
+        } catch (error) {
+            console.error("Failed to load custom exercises from Supabase, falling back to local:", error);
+            const customExercisesJson = await AsyncStorage.getItem('custom_exercises');
+            const localCustom = customExercisesJson ? JSON.parse(customExercisesJson) : [];
+            setExerciseList([...WL_BASE_EXERCISES, ...localCustom]);
+        }
+    };
+
     useFocusEffect(
         React.useCallback(() => {
-            const loadSettingsAndData = async () => {
+            const loadScreenData = async () => {
                 try {
                     const savedTheme = await AsyncStorage.getItem('isDarkMode');
                     setTheme(savedTheme === 'true' ? wlDarkTheme : wlLightTheme);
@@ -85,53 +122,39 @@ function WorkoutLogScreen({ route, navigation }) {
                     }
                     const googleFitStatus = await AsyncStorage.getItem('isGoogleFitConnected') === 'true';
                     setIsGFConnected(googleFitStatus);
+                    
+                    // استدعاء دالة تحميل التمارين المخصصة
+                    await loadCustomExercises();
                 } catch (e) { console.error("Failed to load settings or data", e); }
             };
-            loadSettingsAndData();
+            loadScreenData();
         }, [dateKey])
     );
-
-    useEffect(() => {
-        const loadCustomExercises = async () => {
-            try {
-                const customExercisesJson = await AsyncStorage.getItem('custom_exercises');
-                if (customExercisesJson) {
-                    const customExercises = JSON.parse(customExercisesJson);
-                    setExerciseList([...WL_BASE_EXERCISES, ...customExercises]);
-                }
-            } catch (error) { console.error("Failed to load custom exercises:", error); }
-        };
-        loadCustomExercises();
-    }, []);
-
-    const filteredExercises = exerciseList.filter(exercise => 
-        getExerciseName(exercise.name, language).toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
+    
+    // ... (باقي الدوال تبقى كما هي)
+    const filteredExercises = exerciseList.filter(exercise => getExerciseName(exercise.name, language).toLowerCase().includes(searchQuery.toLowerCase()));
     const handleSelectExercise = (exercise) => { setSelectedExercise(exercise); setDetailsModalVisible(true); };
-
     const handleSaveWorkout = async () => {
         const durationMinutes = parseInt(duration, 10);
         if (!selectedExercise || isNaN(durationMinutes) || durationMinutes <= 0) {
-            Alert.alert(t('errorTitle'), t('invalidDuration'));
-            return;
+            Alert.alert(t('errorTitle'), t('invalidDuration')); return;
         }
         const weightKg = 70; 
         const caloriesBurned = Math.round((selectedExercise.met * 3.5 * weightKg) / 200 * durationMinutes);
-        const newWorkout = {
-            exerciseId: selectedExercise.id,
-            name: getExerciseName(selectedExercise.name, language),
-            duration: durationMinutes,
-            calories: caloriesBurned,
-            icon: selectedExercise.icon,
-            id: `logged_${Date.now()}`
-        };
+        const newWorkout = { exerciseId: selectedExercise.id, name: getExerciseName(selectedExercise.name, language), duration: durationMinutes, calories: caloriesBurned, icon: selectedExercise.icon, id: `logged_${Date.now()}` };
         try {
             const dayJson = await AsyncStorage.getItem(dateKey);
             let dayData = dayJson ? JSON.parse(dayJson) : {};
             const updatedExercises = [...(dayData.exercises || []), newWorkout];
             dayData.exercises = updatedExercises;
             await AsyncStorage.setItem(dateKey, JSON.stringify(dayData));
+            
+            // تحديث بيانات اليوم في Supabase أيضاً
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from('daily_logs').upsert({ user_id: user.id, log_date: dateKey, log_data: dayData }, { onConflict: 'user_id, log_date' });
+            }
+
             setExercises(updatedExercises);
             setDuration('');
             setSearchQuery('');
@@ -142,36 +165,59 @@ function WorkoutLogScreen({ route, navigation }) {
             Alert.alert(t('errorTitle'), t('errorSavingWorkout'));
         }
     };
-
+    
+    // ✅ ===== دالة حفظ البيانات (معدلة بالكامل) ===== ✅
     const handleSaveCustomExercise = async () => {
         if (!customExerciseName.trim()) {
             Alert.alert(t('errorTitle'), t('missingName'));
             return;
         }
         const intensityToMet = { low: 3.0, medium: 6.0, high: 9.0 };
-        const newCustomExercise = {
-            id: `custom_${Date.now()}`, 
-            name: { en: customExerciseName.trim(), ar: customExerciseName.trim() },
-            icon: 'plus-box-outline',
-            met: intensityToMet[customExerciseIntensity], 
-            isCustom: true,
-        };
+        const metValue = intensityToMet[customExerciseIntensity];
+
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not authenticated.");
+
+            // 1. الحفظ في Supabase
+            const { data, error } = await supabase
+                .from('custom_exercises')
+                .insert({
+                    user_id: user.id,
+                    name: customExerciseName.trim(),
+                    met_value: metValue
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            
+            // 2. تحديث الحالة في الواجهة فوراً
+            const newCustomExerciseForUI = {
+                id: `custom_${data.id}`, 
+                name: { en: data.name, ar: data.name },
+                icon: data.icon,
+                met: data.met_value, 
+                isCustom: true,
+            };
+            setExerciseList(prevList => [...prevList, newCustomExerciseForUI]);
+            
+            // 3. تحديث النسخة المحلية
             const existingCustom = await AsyncStorage.getItem('custom_exercises');
             const customExercises = existingCustom ? JSON.parse(existingCustom) : [];
-            const updatedCustomExercises = [...customExercises, newCustomExercise];
-            await AsyncStorage.setItem('custom_exercises', JSON.stringify(updatedCustomExercises));
-            setExerciseList([...WL_BASE_EXERCISES, ...updatedCustomExercises]);
+            await AsyncStorage.setItem('custom_exercises', JSON.stringify([...customExercises, newCustomExerciseForUI]));
+
             setCustomExerciseModalVisible(false);
             setCustomExerciseName('');
             setCustomExerciseIntensity('medium');
             Alert.alert(t('successTitle'), t('customExerciseAdded'));
         } catch (error) {
+            console.error("Error saving custom exercise:", error);
             Alert.alert(t('errorTitle'), t('errorSavingCustom'));
         }
     };
 
-    // ✅ *** REAL GOOGLE FIT INTEGRATION ***: المزامنة الفعلية
+    // ... (باقي الكود يبقى كما هو)
     const handleSyncWithGoogleFit = async () => {
         if (!isGFConnected || !GoogleFit.isAuthorized) {
             Alert.alert("Not Connected", "Please connect to Google Fit from the settings screen first.");
@@ -239,122 +285,28 @@ function WorkoutLogScreen({ route, navigation }) {
             setIsSyncing(false);
         }
     };
-    
     const totalCaloriesBurned = exercises.reduce((sum, ex) => sum + (ex.calories || 0), 0);
-    
-    const renderEmptyState = () => (
-        <View style={styles.emptyContainer(theme)}>
-            <MaterialCommunityIcons name="clipboard-text-off-outline" size={80} color={theme.disabled} />
-            <Text style={styles.emptyTitle(theme)}>{t('emptyTitle')}</Text>
-            <Text style={styles.emptySubtitle(theme)}>{t('emptySubtitle')}</Text>
-        </View>
-    );
-
-    const ExerciseListItem = ({ item }) => {
-        let originalExercise = exerciseList.find(ex => ex.id === item.exerciseId);
-        const displayName = originalExercise 
-            ? getExerciseName(originalExercise.name, language) 
-            : getExerciseName(item.name, language);
-
-        return (
-            <View style={styles.exerciseItemContainer(theme, isRTL)}>
-                <View style={styles.iconContainer(theme)}>
-                    <MaterialCommunityIcons name={item.icon || 'weight-lifter'} size={28} color={theme.primary} />
-                </View>
-                <View style={styles.exerciseDetails(isRTL)}>
-                    <Text style={styles.exerciseName(theme)}>{displayName}</Text>
-                    <Text style={styles.exerciseInfo(theme)}>{item.duration} {t('minutesUnit')} - {Math.round(item.calories)} {t('caloriesUnit')}</Text>
-                </View>
-            </View>
-        );
-    };
-
-    const ListHeader = () => (
-        <View style={styles.summaryContainer(theme)}>
-            <Text style={styles.summaryText(theme)}>🔥 {Math.round(totalCaloriesBurned)} {t('caloriesBurned')}</Text>
-        </View>
-    );
+    const renderEmptyState = () => ( <View style={styles.emptyContainer(theme)}><MaterialCommunityIcons name="clipboard-text-off-outline" size={80} color={theme.disabled} /><Text style={styles.emptyTitle(theme)}>{t('emptyTitle')}</Text><Text style={styles.emptySubtitle(theme)}>{t('emptySubtitle')}</Text></View> );
+    const ExerciseListItem = ({ item }) => { let originalExercise = exerciseList.find(ex => ex.id === item.exerciseId); const displayName = originalExercise ? getExerciseName(originalExercise.name, language) : getExerciseName(item.name, language); return ( <View style={styles.exerciseItemContainer(theme, isRTL)}><View style={styles.iconContainer(theme)}><MaterialCommunityIcons name={item.icon || 'weight-lifter'} size={28} color={theme.primary} /></View><View style={styles.exerciseDetails(isRTL)}><Text style={styles.exerciseName(theme)}>{displayName}</Text><Text style={styles.exerciseInfo(theme)}>{item.duration} {t('minutesUnit')} - {Math.round(item.calories)} {t('caloriesUnit')}</Text></View></View> ); };
+    const ListHeader = () => ( <View style={styles.summaryContainer(theme)}><Text style={styles.summaryText(theme)}>🔥 {Math.round(totalCaloriesBurned)} {t('caloriesBurned')}</Text></View> );
 
     return (
         <SafeAreaView style={styles.rootContainer(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
-            
-            <FlatList 
-                data={exercises} 
-                keyExtractor={(item) => item.id} 
-                renderItem={({ item }) => <ExerciseListItem item={item} />} 
-                ListHeaderComponent={<ListHeader />}
-                contentContainerStyle={styles.listContentContainer} 
-                ListEmptyComponent={renderEmptyState} 
-                extraData={language}
-            />
-
-            <TouchableOpacity style={styles.fab(theme, isRTL)} onPress={() => setAddModalVisible(true)}>
-                <Ionicons name="add" size={32} color={theme.white} />
-            </TouchableOpacity>
-
+            <FlatList data={exercises} keyExtractor={(item) => item.id} renderItem={({ item }) => <ExerciseListItem item={item} />} ListHeaderComponent={<ListHeader />} contentContainerStyle={styles.listContentContainer} ListEmptyComponent={renderEmptyState} extraData={language} />
+            <TouchableOpacity style={styles.fab(theme, isRTL)} onPress={() => setAddModalVisible(true)}><Ionicons name="add" size={32} color={theme.white} /></TouchableOpacity>
             <Modal visible={isAddModalVisible} animationType="slide" onRequestClose={() => setAddModalVisible(false)}>
                 <SafeAreaView style={styles.modalRoot(theme)}>
-                    <View style={styles.modalHeader(theme, isRTL)}>
-                        <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseButton}><Ionicons name="close" size={30} color={theme.primary} /></TouchableOpacity>
-                        <Text style={styles.modalHeaderTitle(theme, isRTL)}>{t('addExerciseTitle')}</Text>
-                         {isGFConnected && (
-                            <TouchableOpacity onPress={handleSyncWithGoogleFit} disabled={isSyncing} style={{ padding: 5 }}>
-                                {isSyncing ? <ActivityIndicator color={theme.primary} /> : <MaterialCommunityIcons name="sync" size={28} color={theme.primary} />}
-                            </TouchableOpacity>
-                        )}
-                    </View>
+                    <View style={styles.modalHeader(theme, isRTL)}><TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseButton}><Ionicons name="close" size={30} color={theme.primary} /></TouchableOpacity><Text style={styles.modalHeaderTitle(theme, isRTL)}>{t('addExerciseTitle')}</Text>{isGFConnected && ( <TouchableOpacity onPress={handleSyncWithGoogleFit} disabled={isSyncing} style={{ padding: 5 }}>{isSyncing ? <ActivityIndicator color={theme.primary} /> : <MaterialCommunityIcons name="sync" size={28} color={theme.primary} />}</TouchableOpacity> )}</View>
                     <View style={styles.searchContainer(theme)}><TextInput style={styles.searchInput(theme, isRTL)} placeholder={t('searchPlaceholder')} placeholderTextColor={theme.textSecondary} value={searchQuery} onChangeText={setSearchQuery} /></View>
-                    <FlatList
-                        data={filteredExercises}
-                        keyExtractor={(item) => item.id}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity style={styles.modalExerciseItem(theme, isRTL)} onPress={() => handleSelectExercise(item)}>
-                                <Text style={styles.modalExerciseName(theme, isRTL)}>{getExerciseName(item.name, language)}</Text>
-                                <View style={styles.modalItemIcons(isRTL)}>
-                                    {item.isCustom && <MaterialCommunityIcons name="star-circle" size={20} color={theme.primary} style={{ [isRTL ? 'marginLeft' : 'marginRight']: 8 }}/>}
-                                    <Ionicons name="add-circle-outline" size={28} color={theme.primary} />
-                                </View>
-                            </TouchableOpacity>
-                        )}
-                        ListFooterComponent={ <TouchableOpacity style={styles.addCustomButton(theme, isRTL)} onPress={() => setCustomExerciseModalVisible(true)}>
-                                <Ionicons name="add" size={24} color={theme.primary} /><Text style={styles.addCustomButtonText(theme)}>{t('addCustomButtonText')}</Text>
-                            </TouchableOpacity> }
-                        ListEmptyComponent={() => (<View style={styles.emptyListContainer}><Text style={styles.emptyListText(theme)}>{t('noResults')}</Text></View>)}
-                    />
+                    <FlatList data={filteredExercises} keyExtractor={(item) => item.id} renderItem={({ item }) => ( <TouchableOpacity style={styles.modalExerciseItem(theme, isRTL)} onPress={() => handleSelectExercise(item)}><Text style={styles.modalExerciseName(theme, isRTL)}>{getExerciseName(item.name, language)}</Text><View style={styles.modalItemIcons(isRTL)}>{item.isCustom && <MaterialCommunityIcons name="star-circle" size={20} color={theme.primary} style={{ [isRTL ? 'marginLeft' : 'marginRight']: 8 }}/>}<Ionicons name="add-circle-outline" size={28} color={theme.primary} /></View></TouchableOpacity> )} ListFooterComponent={ <TouchableOpacity style={styles.addCustomButton(theme, isRTL)} onPress={() => setCustomExerciseModalVisible(true)}><Ionicons name="add" size={24} color={theme.primary} /><Text style={styles.addCustomButtonText(theme)}>{t('addCustomButtonText')}</Text></TouchableOpacity> } ListEmptyComponent={() => (<View style={styles.emptyListContainer}><Text style={styles.emptyListText(theme)}>{t('noResults')}</Text></View>)} />
                 </SafeAreaView>
             </Modal>
-            
             <Modal visible={isDetailsModalVisible} transparent={true} animationType="fade" onRequestClose={() => setDetailsModalVisible(false)}>
-                <View style={styles.detailsModalOverlay(theme)}>
-                    <View style={styles.detailsModalView(theme)}>
-                        <Text style={styles.detailsModalTitle(theme)}>{t('detailsTitle').replace('{exerciseName}', getExerciseName(selectedExercise?.name, language) || '')}</Text>
-                        <TextInput style={styles.detailsModalInput(theme, isRTL)} placeholder={t('durationPlaceholder')} placeholderTextColor={theme.textSecondary} keyboardType="numeric" value={duration} onChangeText={setDuration} autoFocus={true}/>
-                        <View style={styles.detailsModalActions(isRTL)}>
-                            <TouchableOpacity style={[styles.detailsModalButton, styles.cancelButton(theme)]} onPress={() => setDetailsModalVisible(false)}><Text style={styles.cancelButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.detailsModalButton, styles.saveButton(theme)]} onPress={handleSaveWorkout}><Text style={styles.saveButtonText(theme)}>{t('save')}</Text></TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                <View style={styles.detailsModalOverlay(theme)}><View style={styles.detailsModalView(theme)}><Text style={styles.detailsModalTitle(theme)}>{t('detailsTitle').replace('{exerciseName}', getExerciseName(selectedExercise?.name, language) || '')}</Text><TextInput style={styles.detailsModalInput(theme, isRTL)} placeholder={t('durationPlaceholder')} placeholderTextColor={theme.textSecondary} keyboardType="numeric" value={duration} onChangeText={setDuration} autoFocus={true}/><View style={styles.detailsModalActions(isRTL)}><TouchableOpacity style={[styles.detailsModalButton, styles.cancelButton(theme)]} onPress={() => setDetailsModalVisible(false)}><Text style={styles.cancelButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.detailsModalButton, styles.saveButton(theme)]} onPress={handleSaveWorkout}><Text style={styles.saveButtonText(theme)}>{t('save')}</Text></TouchableOpacity></View></View></View>
             </Modal>
-            
             <Modal visible={isCustomExerciseModalVisible} transparent={true} animationType="fade" onRequestClose={() => setCustomExerciseModalVisible(false)}>
-                <View style={styles.detailsModalOverlay(theme)}>
-                    <View style={styles.detailsModalView(theme)}>
-                        <Text style={styles.detailsModalTitle(theme)}>{t('createCustomTitle')}</Text>
-                        <TextInput style={styles.detailsModalInput(theme, isRTL)} placeholder={t('exerciseNamePlaceholder')} placeholderTextColor={theme.textSecondary} value={customExerciseName} onChangeText={setCustomExerciseName}/>
-                        <Text style={styles.intensityLabel(theme)}>{t('intensityLabel')}</Text>
-                        <View style={styles.intensityContainer(isRTL)}>
-                            <TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'low' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('low')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'low' && styles.intensityButtonTextSelected(theme)]}>{t('low')}</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'medium' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('medium')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'medium' && styles.intensityButtonTextSelected(theme)]}>{t('medium')}</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'high' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('high')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'high' && styles.intensityButtonTextSelected(theme)]}>{t('high')}</Text></TouchableOpacity>
-                        </View>
-                        <View style={styles.detailsModalActions(isRTL)}>
-                            <TouchableOpacity style={[styles.detailsModalButton, styles.cancelButton(theme)]} onPress={() => setCustomExerciseModalVisible(false)}><Text style={styles.cancelButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.detailsModalButton, styles.saveButton(theme)]} onPress={handleSaveCustomExercise}><Text style={styles.saveButtonText(theme)}>{t('save')}</Text></TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                <View style={styles.detailsModalOverlay(theme)}><View style={styles.detailsModalView(theme)}><Text style={styles.detailsModalTitle(theme)}>{t('createCustomTitle')}</Text><TextInput style={styles.detailsModalInput(theme, isRTL)} placeholder={t('exerciseNamePlaceholder')} placeholderTextColor={theme.textSecondary} value={customExerciseName} onChangeText={setCustomExerciseName}/><Text style={styles.intensityLabel(theme)}>{t('intensityLabel')}</Text><View style={styles.intensityContainer(isRTL)}><TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'low' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('low')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'low' && styles.intensityButtonTextSelected(theme)]}>{t('low')}</Text></TouchableOpacity><TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'medium' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('medium')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'medium' && styles.intensityButtonTextSelected(theme)]}>{t('medium')}</Text></TouchableOpacity><TouchableOpacity style={[styles.intensityButton(theme), customExerciseIntensity === 'high' && styles.intensityButtonSelected(theme)]} onPress={() => setCustomExerciseIntensity('high')}><Text style={[styles.intensityButtonText(theme), customExerciseIntensity === 'high' && styles.intensityButtonTextSelected(theme)]}>{t('high')}</Text></TouchableOpacity></View><View style={styles.detailsModalActions(isRTL)}><TouchableOpacity style={[styles.detailsModalButton, styles.cancelButton(theme)]} onPress={() => setCustomExerciseModalVisible(false)}><Text style={styles.cancelButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.detailsModalButton, styles.saveButton(theme)]} onPress={handleSaveCustomExercise}><Text style={styles.saveButtonText(theme)}>{t('save')}</Text></TouchableOpacity></View></View></View>
             </Modal>
         </SafeAreaView>
     );
@@ -365,15 +317,7 @@ const styles = {
     summaryContainer: (theme) => ({ backgroundColor: theme.card, padding: 20, alignItems: 'center', marginBottom: 10 }),
     summaryText: (theme) => ({ fontSize: 24, fontWeight: 'bold', color: theme.primary }),
     listContentContainer: { paddingBottom: 100 },
-    exerciseItemContainer: (theme, isRTL) => ({ 
-        flexDirection: isRTL ? 'row-reverse' : 'row', 
-        alignItems: 'center', 
-        backgroundColor: theme.card, 
-        borderRadius: 15, 
-        padding: 15, 
-        marginBottom: 15,
-        marginHorizontal: 20,
-    }),
+    exerciseItemContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', backgroundColor: theme.card, borderRadius: 15, padding: 15, marginBottom: 15, marginHorizontal: 20, }),
     iconContainer: (theme) => ({ width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.iconContainer }),
     exerciseDetails: (isRTL) => ({ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start', [isRTL ? 'marginRight' : 'marginLeft']: 15 }),
     exerciseName: (theme) => ({ fontSize: 18, fontWeight: '600', color: theme.textPrimary, textAlign: 'right' }),
