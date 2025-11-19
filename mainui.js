@@ -181,7 +181,7 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
     );
 };
 
-// ✅ تم الإصلاح: إجبار الحاوية على LTR عشان الرياضيات تفضل شغالة صح
+// ✅ تم الإصلاح: إرجاع الدائرة لتكون ديناميكية تماماً بدلاً من الأرقام الثابتة
 const SummaryCard = ({ data, dailyGoal, theme, t }) => { 
     const SIZE = Dimensions.get('window').width * 0.5; 
     const STROKE_WIDTH = 18; 
@@ -202,20 +202,37 @@ const SummaryCard = ({ data, dailyGoal, theme, t }) => {
     
     const indicatorAnimatedStyle = useAnimatedStyle(() => { 
         const angleRad = (animatedProgress.value * 360 - 90) * (Math.PI / 180); 
-        const x = (SIZE / 2) + CENTER_RADIUS * Math.cos(angleRad); 
-        const y = (SIZE / 2) + CENTER_RADIUS * Math.sin(angleRad); 
-        return { transform: [{ translateX: x }, { translateY: y }], }; 
+        const x = CENTER_RADIUS * Math.cos(angleRad); 
+        const y = CENTER_RADIUS * Math.sin(angleRad); 
+        return { 
+            transform: [
+                { translateX: x }, 
+                { translateY: y } 
+            ], 
+        }; 
     }); 
 
     return (
         <View style={[styles.card(theme), { alignItems: 'center' }]}>
-            {/* direction: 'ltr' هنا مهم جداً عشان الرياضيات متتقلبش */}
             <View style={[styles.summaryCircleContainer, { width: SIZE, height: SIZE, direction: 'ltr' }]}>
                 <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
                     <Circle cx={SIZE / 2} cy={SIZE / 2} r={CENTER_RADIUS} stroke={theme.progressUnfilled} strokeWidth={STROKE_WIDTH} fill="transparent" />
                     <AnimatedPath animatedProps={animatedPathProps} stroke={theme.primary} strokeWidth={STROKE_WIDTH} fill="transparent" strokeLinecap="round" />
                 </Svg>
-                <Animated.View style={[styles.progressIndicatorDot(theme), { width: INDICATOR_SIZE, height: INDICATOR_SIZE, borderRadius: INDICATOR_SIZE / 2, marginLeft: -(INDICATOR_SIZE / 2), marginTop: -(INDICATOR_SIZE / 2), }, indicatorAnimatedStyle]} />
+                {/* ✅ تم الإصلاح: استخدام حسابات ديناميكية (SIZE - INDICATOR_SIZE) / 2 بدلاً من رقم ثابت 155 */}
+                <Animated.View style={[
+                    styles.progressIndicatorDot(theme), 
+                    { 
+                        width: INDICATOR_SIZE, 
+                        height: INDICATOR_SIZE, 
+                        borderRadius: INDICATOR_SIZE / 2,
+                        position: 'absolute', 
+                        // المعادلة دي بتضمن ان النقطة تكون في السنتر مهما كان حجم الشاشة
+                        left: (SIZE - INDICATOR_SIZE) / 2, 
+                        top: (SIZE - INDICATOR_SIZE) / 2,
+                    }, 
+                    indicatorAnimatedStyle
+                ]} />
                 <View style={[styles.summaryTextContainer, {transform: [{scaleX: I18nManager.isRTL ? 1 : 1}]}]}>
                     <Text style={styles.remainingCaloriesText(theme)}>{remaining}</Text>
                     <Text style={styles.remainingLabel(theme)}>{t('remainingCalories')}</Text>
@@ -357,31 +374,31 @@ function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const INDICATOR_DIAMETER = 70;
 
-// ✅ تم الإصلاح: معادلة رياضية ذكية لقلب اتجاه المؤشر في العربية
-const MagicLineTabBar = ({ state, descriptors, navigation, theme, t }) => {
+// ✅ تم الإصلاح: إضافة مصفوفة لتحديد أماكن التبويبات بدقة في العربي والإنجليزي
+const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language }) => {
     const TAB_COUNT = state.routes.length;
     const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
     const [profileImage, setProfileImage] = useState(null);
 
-    // 1. حدد الاتجاه
-    const isRTL = I18nManager.isRTL;
-    const activeIndex = state.index;
-    // 2. في RTL، العنصر 0 يكون في أقصى اليمين (مكان العنصر الأخير في LTR)
-    // لذا نقوم بعكس الفهرس حسابياً ليناسب absolute position
-    const targetIndex = isRTL ? (TAB_COUNT - 1) - activeIndex : activeIndex;
-    
-    const initialPosition = targetIndex * TAB_WIDTH;
-    const translateX = useSharedValue(initialPosition);
+    // هل اللغة عربية؟
+    const isRTL = language === 'ar';
 
-    const previousIndex = useRef(state.index);
+    // دالة لحساب مكان الدائرة بناء على التاب الحالي
+    const getTabPosition = (index) => {
+        const positions = isRTL 
+            ? [0, 1, 2, 3]  // ترتيب العربي
+            : [0, -1, -2, -3]; // ترتيب الإنجليزي
+        
+        return positions[index] * TAB_WIDTH;
+    };
+
+    // 🔥 التعديل هنا: القيمة المبدئية بتبقى مكان التاب الحالي علطول مش 0
+    // ده بيخلي الدائرة تظهر في مكانها الصح فوراً لما ترجع من صفحة تانية
+    const translateX = useSharedValue(getTabPosition(state.index));
 
     useEffect(() => {
-        // نفس المنطق هنا: احسب المكان الجديد بناءً على اللغة
-        const newTargetIndex = isRTL ? (TAB_COUNT - 1) - state.index : state.index;
-        const newPosition = newTargetIndex * TAB_WIDTH;
-        translateX.value = withTiming(newPosition, { duration: 300 }); 
-
-        previousIndex.current = state.index;
+        const targetPosition = getTabPosition(state.index);
+        translateX.value = withTiming(targetPosition, { duration: 300 }); 
     }, [state.index, TAB_WIDTH, isRTL]);
 
     useFocusEffect(useCallback(() => {
@@ -400,11 +417,18 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t }) => {
     const routes = state.routes;
 
     return (
-        <View style={styles.tabBarContainer(theme)}>
+        <View style={[styles.tabBarContainer(theme), { 
+            direction: 'ltr',      
+            flexDirection: 'row'   
+        }]}>
             <View style={styles.animationWrapper}><LeafAnimation trigger={state.index} /></View>
             
-            {/* ✅ هام: direction: 'ltr' هنا يجعل translateX يعمل دائماً من اليسار لليمين بشكل فيزيائي، ونحن نتحكم في المكان بالمعادلة أعلاه */}
-            <Animated.View style={[styles.indicatorContainer, { width: TAB_WIDTH, direction: 'ltr' }, indicatorAnimatedStyle]}>
+            {/* الدائرة والمؤشر */}
+            <Animated.View style={[
+                styles.indicatorContainer, 
+                { width: TAB_WIDTH, direction: 'ltr' }, 
+                indicatorAnimatedStyle
+            ]}>
                 <View style={[styles.indicator(theme), { backgroundColor: theme.tabBarIndicator }]}>
                     <View style={[styles.cutout, styles.cutoutLeft(theme)]} />
                     <View style={[styles.cutout, styles.cutoutRight(theme)]} />
@@ -455,7 +479,6 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t }) => {
         </View>
     );
 };
-
 
 const Tab = createBottomTabNavigator();
 const DiaryStack = createStackNavigator();
@@ -671,7 +694,7 @@ const styles = StyleSheet.create({
     nutrientRowContainer: { marginBottom: 15, }, 
     nutrientRowLabel: (theme) => ({ fontSize: 16, color: theme.textPrimary, fontWeight: '600', }), 
     nutrientRowValue: (theme) => ({ fontSize: 14, color: theme.textSecondary, }), 
-    tabBarContainer: (theme) => ({ position: 'absolute', bottom: 0, left: 0, right: 0, height: 70, flexDirection: 'row', backgroundColor: theme.tabBarBackground }),
+    tabBarContainer: (theme) => ({ position: 'absolute', bottom: 0, left: 0, right: 0, height: 70, backgroundColor: theme.tabBarBackground }),
     tabItem: { height: 70, justifyContent: 'center', alignItems: 'center' }, 
     tabIconContainer: { width: 60, height: 60, justifyContent: 'center', alignItems: 'center', },
     tabText: (theme) => ({ position: 'absolute', color: theme.tabBarIcon, fontSize: 12, fontWeight: '400' }), 

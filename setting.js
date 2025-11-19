@@ -116,25 +116,28 @@ const formatTime = (date, lang = 'en') => {
     return `${hours}:${minutes} ${ampm}`;
 };
 
-// ✅ ده الكود بتاعك القديم بس متصلح
-// أجبرنا الاتجاه يكون LTR عشان الحسابات ما تبوظش في العربي
-const DarkModeToggle = ({ value, onValueChange }) => {
+// ✅✅✅ الحل النهائي: فصلنا المسارات للعربي والانجليزي ✅✅✅
+const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => { 
       Animated.timing(animation, { 
           toValue: value ? 1 : 0, 
           duration: 250, 
-          useNativeDriver: false, // مهم عشان backgroundColor
+          useNativeDriver: false, 
       }).start(); 
   }, [value, animation]);
 
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   const thumbColor = '#FFFFFF';
   
-  // ✅ التعديل المهم: الحركة دائماً موجبة لأننا هنجبر الكونتينر يكون LTR
-  // المسافة دي (22) تضمن إن الدائرة تفضل جوه المستطيل
-  const translateX = animation.interpolate({ inputRange: [0, 1], outputRange: [0, -27] });
+  // 🔥 هنا الفصل الحقيقي:
+  // لو عربي (isRTL): ابدأ من الصفر وارجع لورا (-26) عشان تفضل جوه المربع
+  // لو انجليزي: ابدأ من الصفر واطلع لقدام (26)
+  const translateX = animation.interpolate({ 
+      inputRange: [0, 1], 
+      outputRange: isRTL ? [-27, 0] : [27, 0] 
+  });
 
   return (
     <TouchableOpacity onPress={() => onValueChange(!value)} activeOpacity={0.8}>
@@ -142,8 +145,10 @@ const DarkModeToggle = ({ value, onValueChange }) => {
           styles.toggleContainer, 
           { 
               backgroundColor: trackColor, 
-              direction: 'ltr', // ✅ إجبار الاتجاه شمال ليمين عشان ما يعكسش في العربي
-              alignItems: 'flex-start', // ✅ البداية دائماً من الشمال
+              // لو عربي: بنسيبه RTL طبيعي عشان يبدأ من اليمين
+              // لو انجليزي: بنجبره LTR عشان يبدأ من الشمال
+              direction: isRTL ? 'rtl' : 'ltr', 
+              alignItems: 'flex-start', 
               justifyContent: 'center'
           }
       ]}>
@@ -178,6 +183,7 @@ const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => (
     </TouchableOpacity> 
 );
 
+// ✅ مررنا isRTL هنا عشان يوصل للزرار
 const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
@@ -211,8 +217,8 @@ const SettingsToggleItem = ({ icon, label, description, value, onValueChange, th
       </TouchableOpacity>
     )}
     
-    {/* ✅ رجعنا المكون بتاعك هنا */}
-    <DarkModeToggle value={value} onValueChange={onValueChange} />
+    {/* بنبعت isRTL للزرار */}
+    <DarkModeToggle value={value} onValueChange={onValueChange} isRTL={isRTL} />
   </View>
 );
 
@@ -583,7 +589,7 @@ const styles = StyleSheet.create({
   
   sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 28, paddingVertical: 10, marginTop: 10 },
   
-  // ✅ ستايلات الزرار المخصص رجعت تاني
+  // ستايل الزرار المخصص
   toggleContainer: { width: 52, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center', alignItems: 'flex-start' },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
   
