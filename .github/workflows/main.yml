@@ -1,4 +1,4 @@
-name: Build Android Release (No Secrets - Auto Gen Key)
+name: Build Android Release (Fix Plugin Error)
 
 on:
   push:
@@ -14,30 +14,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. تجهيز Node.js
+      # 2. تنظيف وإزالة مجلد android القديم (خطوة هامة جداً لحل مشكلتك)
+      # هذا يضمن أن Expo سينشئ مجلد جديد متوافق تماماً مع المكتبات
+      - name: Clean old Android folder
+        run: rm -rf android
+
+      # 3. تجهيز Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.x
           cache: 'npm'
 
-      # 3. تجهيز Java
+      # 4. تجهيز Java 17 (الإصدار المستقر مع React Native)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 4. تثبيت المكتبات
+      # 5. تثبيت المكتبات
       - name: Install dependencies
         run: npm install
 
-      # 5. إنشاء ملفات الأندرويد
+      # 6. إنشاء ملفات الأندرويد من الصفر
       - name: Generate native Android files
-        run: npx expo prebuild --platform android --no-install
+        run: npx expo prebuild --platform android --no-install --clean
 
-      # 6. ✅ إنشاء مفتاح توقيع مؤقت (بديل للـ Secrets)
-      # نقوم بتوليد ملف keystore بكلمة مرور بسيطة "123456"
+      # 7. إنشاء مفتاح توقيع مؤقت (لعمل نسخة Release بدون أسرار)
       - name: Generate Temporary Keystore
         working-directory: ./android/app
         run: |
@@ -47,23 +51,23 @@ jobs:
           -storepass 123456 -keypass 123456 \
           -dname "CN=Android,O=Android,C=US"
 
-      # 7. إعطاء صلاحية التنفيذ
+      # 8. إعطاء صلاحية التنفيذ
       - name: Make gradlew executable
         working-directory: ./android
         run: chmod +x ./gradlew
 
-      # 8. بناء Release APK باستخدام المفتاح المؤقت
+      # 9. بناء Release APK
+      # أضفنا --stacktrace لنرى تفاصيل أدق لو حدث خطأ، لكن إن شاء الله سيعمل
       - name: Build Android Release APK
         working-directory: ./android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
         env:
-          # نمرر هنا اسم المفتاح وكلمة المرور التي أنشأناها في الخطوة 6
           MYAPP_UPLOAD_STORE_FILE: release.keystore
           MYAPP_UPLOAD_KEY_ALIAS: androidrelease
           MYAPP_UPLOAD_STORE_PASSWORD: 123456
           MYAPP_UPLOAD_KEY_PASSWORD: 123456
 
-      # 9. رفع الـ APK الناتج
+      # 10. رفع الـ APK الناتج
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
