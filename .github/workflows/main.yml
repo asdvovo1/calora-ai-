@@ -1,4 +1,4 @@
-name: Build Android Release (Fix Plugin Error)
+name: Fix Build Android Release
 
 on:
   push:
@@ -14,8 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. تنظيف وإزالة مجلد android القديم (خطوة هامة جداً لحل مشكلتك)
-      # هذا يضمن أن Expo سينشئ مجلد جديد متوافق تماماً مع المكتبات
+      # 2. حذف مجلد android القديم (تنظيف كامل)
       - name: Clean old Android folder
         run: rm -rf android
 
@@ -26,22 +25,24 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
-      # 4. تجهيز Java 17 (الإصدار المستقر مع React Native)
+      # 4. تجهيز Java 17 (وإعطاؤه ID لاستخدامه لاحقاً)
       - name: Set up Java
+        id: setup-java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 5. تثبيت المكتبات
+      # 5. تثبيت نظيف للمكتبات (Clean Install)
+      # npm ci أفضل من npm install في السيرفرات لأنه يلتزم بـ package-lock.json بدقة
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # 6. إنشاء ملفات الأندرويد من الصفر
+      # 6. إنشاء ملفات الأندرويد
       - name: Generate native Android files
         run: npx expo prebuild --platform android --no-install --clean
 
-      # 7. إنشاء مفتاح توقيع مؤقت (لعمل نسخة Release بدون أسرار)
+      # 7. إنشاء مفتاح توقيع مؤقت
       - name: Generate Temporary Keystore
         working-directory: ./android/app
         run: |
@@ -56,18 +57,25 @@ jobs:
         working-directory: ./android
         run: chmod +x ./gradlew
 
-      # 9. بناء Release APK
-      # أضفنا --stacktrace لنرى تفاصيل أدق لو حدث خطأ، لكن إن شاء الله سيعمل
+      # 9. بناء التطبيق مع إجبار استخدام Java 17
+      # لاحظ الإضافة: -Dorg.gradle.java.home
+      # هذا يمنع Gradle من استخدام Java 22 الافتراضية في السيرفر
       - name: Build Android Release APK
         working-directory: ./android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          JAVA_HOME: ${{ steps.setup-java.outputs.path }}
+        run: |
+          ./gradlew assembleRelease \
+            -Dorg.gradle.java.home=${{ steps.setup-java.outputs.path }} \
+            --no-daemon \
+            --stacktrace
         env:
           MYAPP_UPLOAD_STORE_FILE: release.keystore
           MYAPP_UPLOAD_KEY_ALIAS: androidrelease
           MYAPP_UPLOAD_STORE_PASSWORD: 123456
           MYAPP_UPLOAD_KEY_PASSWORD: 123456
 
-      # 10. رفع الـ APK الناتج
+      # 10. رفع الـ APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
