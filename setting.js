@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView,
   StatusBar, Animated, I18nManager, Platform, Modal, TextInput, Clipboard,
-  ActivityIndicator, NativeModules
+  ActivityIndicator
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +12,6 @@ import { Pedometer } from 'expo-sensors';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GoogleFit, { Scopes } from 'react-native-google-fit';
 import { useFocusEffect } from '@react-navigation/native';
-// ✅ إضافة مكتبة التحديثات لإعادة التشغيل
 import * as Updates from 'expo-updates';
 
 import notificationsData from './notificationsdata'; 
@@ -89,13 +88,15 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', text: '#1C1C1E', secondaryText: '#8A8A8E', iconContainer: '#E8F5E9', separator: '#EAEAEA', iconColor: '#1C1C1E', danger: '#D32F2F', statusBar: 'dark-content', primary: '#4CAF50' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', text: '#FFFFFF', secondaryText: '#A5A5A5', iconContainer: '#3A3A3C', separator: '#38383A', iconColor: '#FFFFFF', danger: '#EF5350', statusBar: 'light-content', primary: '#4CAF50' };
 
+// ✅ Header: تم تعديل الاتجاه
 const ScreenHeader = ({ title, onBackPress, theme, action, isRTL }) => (
     <View style={[styles.headerContainer, { 
         backgroundColor: theme.surface, 
         borderBottomColor: theme.separator,
-        flexDirection: 'row'
+        flexDirection: isRTL ? 'row-reverse' : 'row' // عكس الاتجاه في العربي
     }]}>
       <TouchableOpacity onPress={onBackPress} style={styles.headerButton}>
+        {/* السهم بيتعكس اسمه في العربي */}
         <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
@@ -132,9 +133,10 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   const thumbColor = '#FFFFFF';
   
+  // تعديل حركة الزر بناء على الاتجاه
   const translateX = animation.interpolate({ 
       inputRange: [0, 1], 
-      outputRange: isRTL ? [-27, 0] : [27, 0] 
+      outputRange: isRTL ? [-13, 13] : [27, 0] 
   });
 
   return (
@@ -143,9 +145,9 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
           styles.toggleContainer, 
           { 
               backgroundColor: trackColor, 
-              direction: isRTL ? 'rtl' : 'ltr', 
-              alignItems: 'flex-start', 
-              justifyContent: 'center'
+              // استخدام flex-direction للتحكم في مكان البداية
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center', 
           }
       ]}>
         <Animated.View style={[styles.toggleThumb, { backgroundColor: thumbColor, transform: [{ translateX }] }]} />
@@ -154,55 +156,60 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   );
 };
 
+// ✅ SettingsActionItem: تم ضبط الاتجاه والهوامش
 const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => ( 
     <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
         backgroundColor: theme.surface,
-        flexDirection: 'row'
+        flexDirection: isRTL ? 'row-reverse' : 'row' // عكس الصف بالكامل
     }]}>
         <View style={{ 
-            flexDirection: 'row', 
+            flexDirection: isRTL ? 'row-reverse' : 'row', // عكس المحتوى الداخلي
             alignItems: 'center', 
             flex: 1 
         }}>
             <View style={[styles.iconContainer, { 
                 backgroundColor: theme.iconContainer,
-                marginEnd: 16 
+                // الهامش بيتعكس
+                marginLeft: isRTL ? 16 : 0,
+                marginRight: isRTL ? 0 : 16
             }]}>
                 <Icon name={icon} size={22} color={color || theme.iconColor} />
             </View>
             <Text style={[styles.label, { 
                 color: color || theme.text,
-                textAlign: 'left'
+                textAlign: isRTL ? 'right' : 'left'
             }]}>{label}</Text>
         </View>
         <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={24} color="#B0B0B0" />
     </TouchableOpacity> 
 );
 
+// ✅ SettingsToggleItem: تم ضبط الاتجاه
 const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
-      flexDirection: 'row'
+      flexDirection: isRTL ? 'row-reverse' : 'row'
   }]}>
     <View style={{ 
-        flexDirection: 'row', 
+        flexDirection: isRTL ? 'row-reverse' : 'row',
         alignItems: 'center', 
         flex: 1 
     }}>
       <View style={[styles.iconContainer, { 
           backgroundColor: theme.iconContainer,
-          marginEnd: 16
+          marginLeft: isRTL ? 16 : 0,
+          marginRight: isRTL ? 0 : 16
       }]}>
         <Icon name={icon} size={22} color={theme.iconColor} />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
         <Text style={[styles.label, { 
             color: theme.text,
-            textAlign: 'left'
+            textAlign: isRTL ? 'right' : 'left'
         }]}>{label}</Text>
         {description && <Text style={[styles.description, { 
             color: theme.secondaryText,
-            textAlign: 'left'
+            textAlign: isRTL ? 'right' : 'left'
         }]}>{description}</Text>}
       </View>
     </View>
@@ -216,15 +223,16 @@ const SettingsToggleItem = ({ icon, label, description, value, onValueChange, th
   </View>
 );
 
+// ✅ LanguageSelectionItem: تم ضبط الاتجاه
 const LanguageSelectionItem = ({ label, isSelected, onPress, theme, isRTL }) => ( 
     <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
         backgroundColor: theme.surface,
-        flexDirection: 'row'
+        flexDirection: isRTL ? 'row-reverse' : 'row'
     }]}>
         <Text style={[styles.label, { 
             color: theme.text, 
             flex: 1,
-            textAlign: 'left'
+            textAlign: isRTL ? 'right' : 'left'
         }]}>{label}</Text>
         {isSelected && <Icon name="check-circle" size={24} color="#4CAF50" />}
     </TouchableOpacity> 
@@ -233,23 +241,25 @@ const LanguageSelectionItem = ({ label, isSelected, onPress, theme, isRTL }) => 
 const SettingsSectionHeader = ({ title, theme, isRTL }) => ( 
     <Text style={[styles.sectionHeader, { 
         color: theme.secondaryText,
-        textAlign: 'left'
+        textAlign: isRTL ? 'right' : 'left'
     }]}>{title}</Text> 
 );
 
+// ✅ SettingsIntegrationItem: تم ضبط الاتجاه
 const SettingsIntegrationItem = ({ icon, label, isConnected, onConnect, onDisconnect, theme, t, isLoading, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
-      flexDirection: 'row'
+      flexDirection: isRTL ? 'row-reverse' : 'row'
   }]}>
     <View style={{ 
-        flexDirection: 'row', 
+        flexDirection: isRTL ? 'row-reverse' : 'row',
         alignItems: 'center', 
         flex: 1 
     }}>
       <View style={[styles.iconContainer, { 
           backgroundColor: theme.iconContainer,
-          marginEnd: 16
+          marginLeft: isRTL ? 16 : 0,
+          marginRight: isRTL ? 0 : 16
       }]}>
         <Icon name={icon} size={22} color={theme.iconColor} />
       </View>
@@ -473,7 +483,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const handleDisconnectGoogleFit = async () => { try { await GoogleFit.disconnect(); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert("Google Fit", t('disconnectSuccess')); } catch (error) { console.error("DISCONNECT_ERROR", error); } };
 
-  // ✅✅✅ دالة حفظ اللغة الجديدة باستخدام Expo Updates ✅✅✅
   const handleSaveLanguage = async () => {
     if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
     try {
@@ -493,7 +502,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
                 text: 'OK', 
                 onPress: async () => { 
                     try {
-                        // استخدمنا Updates.reloadAsync عشان يشتغل في الـ APK
                         await Updates.reloadAsync();
                     } catch(e) {
                        console.log("Error reloading", e);
@@ -528,7 +536,7 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
         return ( <View style={{ paddingTop: 20 }}><LanguageSelectionItem label="English" isSelected={selectedLanguage === 'en'} onPress={() => setSelectedLanguage('en')} theme={theme} isRTL={isRTL} /><LanguageSelectionItem label="العربية" isSelected={selectedLanguage === 'ar'} onPress={() => setSelectedLanguage('ar')} theme={theme} isRTL={isRTL} /></View> );
     }
     if (currentView === 'export') { 
-        return ( <View style={{paddingHorizontal: 16, paddingTop: 20}}><Text style={[styles.exportDescription, { color: theme.secondaryText, textAlign: 'left' }]}>{t('exportDataDescription')}</Text><TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.iconColor }]} onPress={handlePrepareExportData}><Icon name="database-arrow-down-outline" size={22} color={theme.background} style={ { marginEnd: 12 } } /><Text style={[styles.exportButtonText, { color: theme.background }]}>{t('exportAllData')}</Text></TouchableOpacity>{exportDataContent ? ( <View><TextInput style={[styles.dataBox, { color: theme.text, borderColor: theme.separator, backgroundColor: theme.surface, textAlign: 'left' }]} value={exportDataContent} multiline={true} editable={false} /><TouchableOpacity style={[styles.exportButton, { backgroundColor: '#4CAF50', marginTop: 10 }]} onPress={copyToClipboard}><Icon name="content-copy" size={22} color={'#FFFFFF'} style={{ marginEnd: 12 }} /><Text style={[styles.exportButtonText, { color: '#FFFFFF' }]}>{t('copyToClipboard')}</Text></TouchableOpacity></View> ) : null}</View> );
+        return ( <View style={{paddingHorizontal: 16, paddingTop: 20}}><Text style={[styles.exportDescription, { color: theme.secondaryText, textAlign: isRTL ? 'right' : 'left' }]}>{t('exportDataDescription')}</Text><TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.iconColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handlePrepareExportData}><Icon name="database-arrow-down-outline" size={22} color={theme.background} style={ { marginEnd: isRTL ? 0 : 12, marginStart: isRTL ? 12 : 0 } } /><Text style={[styles.exportButtonText, { color: theme.background }]}>{t('exportAllData')}</Text></TouchableOpacity>{exportDataContent ? ( <View><TextInput style={[styles.dataBox, { color: theme.text, borderColor: theme.separator, backgroundColor: theme.surface, textAlign: 'left' }]} value={exportDataContent} multiline={true} editable={false} /><TouchableOpacity style={[styles.exportButton, { backgroundColor: '#4CAF50', marginTop: 10, flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={copyToClipboard}><Icon name="content-copy" size={22} color={'#FFFFFF'} style={{ marginEnd: isRTL ? 0 : 12, marginStart: isRTL ? 12 : 0 }} /><Text style={[styles.exportButtonText, { color: '#FFFFFF' }]}>{t('copyToClipboard')}</Text></TouchableOpacity></View> ) : null}</View> );
     }
     return (
         <>
@@ -582,12 +590,12 @@ const styles = StyleSheet.create({
   
   sectionHeader: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', paddingHorizontal: 28, paddingVertical: 10, marginTop: 10 },
   
-  toggleContainer: { width: 52, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center', alignItems: 'flex-start' },
+  toggleContainer: { width: 52, height: 26, borderRadius: 13, padding: 2, justifyContent: 'center' },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
   
   exportDescription: { fontSize: 15, lineHeight: 22, marginBottom: 24, paddingHorizontal: 12 },
   
-  exportButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 15, borderRadius: 12, marginHorizontal: 16, },
+  exportButton: { alignItems: 'center', justifyContent: 'center', paddingVertical: 15, borderRadius: 12, marginHorizontal: 16, },
   exportButtonText: { fontSize: 16, fontWeight: 'bold', },
   
   dataBox: { marginTop: 20, padding: 10, height: 200, borderWidth: 1, borderRadius: 8, textAlignVertical: 'top', fontSize: 12 },

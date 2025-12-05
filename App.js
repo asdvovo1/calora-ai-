@@ -3,18 +3,16 @@ import 'react-native-get-random-values';
 import 'react-native-gesture-handler';
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, I18nManager } from 'react-native';
+import { View, StyleSheet, I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { supabase } from './supabaseclient';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// ✅ إضافة مكتبة التحديثات هنا أيضاً
-import * as Updates from 'expo-updates';
+// ❌ شيلنا Updates عشان هو اللي كان بيعمل الـ Loop
 
 import SplashScreen from './Splash'; 
-
 import IndexScreen from './Index';
 import SignInScreen from './signin';
 import SignUpScreen from './signup';
@@ -63,13 +61,12 @@ const App = () => {
         const currentLang = savedLang || 'en';
         const isRTLRequired = currentLang === 'ar';
 
-        // ✅ التأكد من اتجاه اللغة عند فتح التطبيق
+        // ✅ التصحيح: بنجبر التطبيق يغير الاتجاه للمرة الجاية
+        // بس مش بنعمل reloadAsync عشان ميعملش Loop
         if (I18nManager.isRTL !== isRTLRequired) {
-          I18nManager.allowRTL(isRTLRequired);
-          I18nManager.forceRTL(isRTLRequired);
-          // استخدام Updates لعمل ريستارت في الـ APK
-          await Updates.reloadAsync();
-          return;
+            I18nManager.allowRTL(isRTLRequired);
+            I18nManager.forceRTL(isRTLRequired);
+            // التغيير ده هيطبق 100% لما اليوزر يقفل التطبيق ويفتحه تاني
         }
 
         setAppLanguage(currentLang);
@@ -163,7 +160,7 @@ const App = () => {
               {(props) => <ResultsScreen {...props} appLanguage={appLanguage} />}
             </Stack.Screen>
             <Stack.Screen name="Settings">
-              {(props) => <SettingsScreen {...props} onThemeChange={async (isDark) => { await AsyncStorage.setItem('isDarkMode', String(isDark)); }} />}
+              {(props) => <SettingsScreen {...props} appLanguage={appLanguage} onThemeChange={async (isDark) => { await AsyncStorage.setItem('isDarkMode', String(isDark)); }} />}
             </Stack.Screen>
             <Stack.Screen name="MainUI">
               {(props) => <MainUI {...props} appLanguage={appLanguage} />}
