@@ -125,7 +125,7 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
     const isNextDisabled = startDate.getTime() >= todayWeekStart.getTime();
 
     // أيقونات الأسهم
-    const prevIcon = isRTL ? "chevron-forward-outline" : "chevron-back-outline";
+    const prevIcon = isRTL ? "chevron-forward-outline" : "ؤchevron-back-outline";
     const nextIcon = isRTL ? "chevron-back-outline" : "chevron-forward-outline";
 
     // الستايل الديناميكي

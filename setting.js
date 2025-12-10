@@ -16,6 +16,15 @@ import * as Updates from 'expo-updates';
 
 import notificationsData from './notificationsdata'; 
 
+// ✅ 1. إعداد الـ Handler (مهم جداً عشان الإشعار يظهر والتطبيق مفتوح)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 const translations = {
   en: {
     settings: 'Settings', notifications: 'Notifications', language: 'Language', darkMode: 'Dark Mode',
@@ -88,15 +97,13 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', text: '#1C1C1E', secondaryText: '#8A8A8E', iconContainer: '#E8F5E9', separator: '#EAEAEA', iconColor: '#1C1C1E', danger: '#D32F2F', statusBar: 'dark-content', primary: '#4CAF50' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', text: '#FFFFFF', secondaryText: '#A5A5A5', iconContainer: '#3A3A3C', separator: '#38383A', iconColor: '#FFFFFF', danger: '#EF5350', statusBar: 'light-content', primary: '#4CAF50' };
 
-// ✅ Header: تم تعديل الاتجاه
 const ScreenHeader = ({ title, onBackPress, theme, action, isRTL }) => (
     <View style={[styles.headerContainer, { 
         backgroundColor: theme.surface, 
         borderBottomColor: theme.separator,
-        flexDirection: isRTL ? 'row-reverse' : 'row' // عكس الاتجاه في العربي
+        flexDirection: isRTL ? 'row-reverse' : 'row'
     }]}>
       <TouchableOpacity onPress={onBackPress} style={styles.headerButton}>
-        {/* السهم بيتعكس اسمه في العربي */}
         <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
@@ -119,6 +126,7 @@ const formatTime = (date, lang = 'en') => {
     return `${hours}:${minutes} ${ampm}`;
 };
 
+// ✅ Toggle Component: تم تعديل الحركة للإنجليزي
 const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -133,10 +141,12 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   const thumbColor = '#FFFFFF';
   
-  // تعديل حركة الزر بناء على الاتجاه
+  // ✅ التعديل هنا: حركة الدائرة
+  // لو عربي (isRTL): يتحرك من -13 لـ 13
+  // لو إنجليزي: يتحرك من 0 لـ 22 (من الشمال لليمين)
   const translateX = animation.interpolate({ 
       inputRange: [0, 1], 
-      outputRange: isRTL ? [-13, 13] : [27, 0] 
+      outputRange: isRTL ? [-13, 13] : [0, 22] 
   });
 
   return (
@@ -145,7 +155,6 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
           styles.toggleContainer, 
           { 
               backgroundColor: trackColor, 
-              // استخدام flex-direction للتحكم في مكان البداية
               flexDirection: isRTL ? 'row-reverse' : 'row',
               alignItems: 'center', 
           }
@@ -156,20 +165,18 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   );
 };
 
-// ✅ SettingsActionItem: تم ضبط الاتجاه والهوامش
 const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => ( 
     <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
         backgroundColor: theme.surface,
-        flexDirection: isRTL ? 'row-reverse' : 'row' // عكس الصف بالكامل
+        flexDirection: isRTL ? 'row-reverse' : 'row'
     }]}>
         <View style={{ 
-            flexDirection: isRTL ? 'row-reverse' : 'row', // عكس المحتوى الداخلي
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             alignItems: 'center', 
             flex: 1 
         }}>
             <View style={[styles.iconContainer, { 
                 backgroundColor: theme.iconContainer,
-                // الهامش بيتعكس
                 marginLeft: isRTL ? 16 : 0,
                 marginRight: isRTL ? 0 : 16
             }]}>
@@ -184,7 +191,6 @@ const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => (
     </TouchableOpacity> 
 );
 
-// ✅ SettingsToggleItem: تم ضبط الاتجاه
 const SettingsToggleItem = ({ icon, label, description, value, onValueChange, theme, time, onTimePress, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
@@ -223,7 +229,6 @@ const SettingsToggleItem = ({ icon, label, description, value, onValueChange, th
   </View>
 );
 
-// ✅ LanguageSelectionItem: تم ضبط الاتجاه
 const LanguageSelectionItem = ({ label, isSelected, onPress, theme, isRTL }) => ( 
     <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
         backgroundColor: theme.surface,
@@ -245,7 +250,6 @@ const SettingsSectionHeader = ({ title, theme, isRTL }) => (
     }]}>{title}</Text> 
 );
 
-// ✅ SettingsIntegrationItem: تم ضبط الاتجاه
 const SettingsIntegrationItem = ({ icon, label, isConnected, onConnect, onDisconnect, theme, t, isLoading, isRTL }) => (
   <View style={[styles.settingsItem, { 
       backgroundColor: theme.surface,
@@ -300,6 +304,35 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   const theme = isDarkMode ? darkTheme : lightTheme;
   const t = (key, lang = activeLanguage) => translations[lang]?.[key] || translations['en'][key];
 
+  // ✅ 2. طلب الإذن وإعداد القناة عند فتح الشاشة
+  useEffect(() => {
+    async function registerForPushNotificationsAsync() {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.log('Permission not granted!');
+        return;
+      }
+    }
+
+    registerForPushNotificationsAsync();
+  }, []);
+
   const displayTime = (timeString, lang) => {
     if (!timeString || !timeString.includes(':')) return '';
     const [hour, minute] = timeString.split(':');
@@ -350,26 +383,50 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
 
   const scheduleAllNotifications = async (currentSettings, currentLang) => {
     if (Platform.OS === 'web') return;
+    
+    // التأكد من الإذن
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+       // حاول تطلب الإذن تاني لو مش موجود
+       const { status: newStatus } = await Notifications.requestPermissionsAsync();
+       if(newStatus !== 'granted') {
+           Alert.alert(t('notificationsPermissionTitle'), t('notificationsPermissionMessage'));
+           return;
+       }
+    }
+
     await Notifications.cancelAllScheduledNotificationsAsync();
     const data = notificationsData.notifications[currentLang] || notificationsData.notifications.en;
+    
     for (const key in currentSettings) {
         if (!currentSettings[key] || !currentSettings[key].enabled) continue;
         const settings = currentSettings[key];
         const titleKey = key === 'weighIn' ? 'weighInReminder' : (key === 'water' ? 'waterReminder' : (key === 'workout' ? 'workoutReminder' : key));
         const notificationTitle = t(titleKey, currentLang);
+        
         if (key === 'water') {
-            await Notifications.scheduleNotificationAsync({ content: { title: notificationTitle, body: data?.water?.[0] || 'Time to hydrate!' }, trigger: { seconds: 2 * 60 * 60, repeats: true }, identifier: `reminder_water` });
+            await Notifications.scheduleNotificationAsync({ 
+                content: { title: notificationTitle, body: data?.water?.[0] || 'Time to hydrate!' }, 
+                trigger: { seconds: 2 * 60 * 60, repeats: true }, 
+                identifier: `reminder_water` 
+            });
         } else if (settings.time) {
             if (!data) continue;
             let messageList;
             if (data.meal_reminders && data.meal_reminders[key]) { messageList = data.meal_reminders[key]; } else if (data[key]) { messageList = data[key]; }
             if (!messageList || messageList.length === 0) continue;
+            
             const [hour, minute] = settings.time.split(':').map(Number);
             const isWeekly = key === 'weighIn';
             const daysToSchedule = isWeekly ? 4 : 7;
+            
             for (let i = 0; i < daysToSchedule; i++) {
                 const messageBody = messageList[i % messageList.length];
                 let triggerDate = new Date();
+                
+                triggerDate.setSeconds(0);
+                triggerDate.setMilliseconds(0);
+
                 if (isWeekly) {
                     const targetDay = settings.day;
                     const daysToAdd = (targetDay - triggerDate.getDay() + 7) % 7;
@@ -378,12 +435,22 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
                     triggerDate.setDate(new Date().getDate() + i);
                 }
                 triggerDate.setHours(hour, minute, 0, 0);
-                if (triggerDate < new Date()) { if (isWeekly) continue; triggerDate.setDate(triggerDate.getDate() + 7); }
-                await Notifications.scheduleNotificationAsync({ content: { title: notificationTitle, body: messageBody }, trigger: triggerDate, identifier: `reminder_${key}_${i}` });
+                
+                if (triggerDate < new Date()) { 
+                    if (isWeekly) continue; 
+                    triggerDate.setDate(triggerDate.getDate() + 7); 
+                }
+
+                await Notifications.scheduleNotificationAsync({ 
+                    content: { title: notificationTitle, body: messageBody }, 
+                    trigger: triggerDate, 
+                    identifier: `reminder_${key}_${i}` 
+                });
             }
         }
     }
   };
+
   const handleToggleStepsReminder = async () => {
     const newReminders = { ...reminders, stepsGoal: { enabled: !reminders.stepsGoal.enabled } };
     setReminders(newReminders);
@@ -445,6 +512,17 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const handleToggleReminder = async (key) => {
     if (key === 'stepsGoal') { await handleToggleStepsReminder(); return; }
+    
+    // Check permission first
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+       const { status: newStatus } = await Notifications.requestPermissionsAsync();
+       if (newStatus !== 'granted') {
+          Alert.alert(t('notificationsPermissionTitle'), t('notificationsPermissionMessage'));
+          return;
+       }
+    }
+
     const newReminders = { ...reminders, [key]: { ...reminders[key], enabled: !reminders[key].enabled } };
     setReminders(newReminders);
     await AsyncStorage.setItem('reminderSettings', JSON.stringify(newReminders));

@@ -151,7 +151,6 @@ const SignInScreen = ({ navigation, appLanguage }) => {
             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex: 1}}>
                 <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={styles.header(theme)}>
-                        {/* هنا تم تطبيق التعديل للشجرة العلوية */}
                         <Image source={require('./assets/leafshadowcorner.png')} style={styles.headerImageTopLeft(isRTL)} resizeMode="contain" />
                         <Image source={require('./assets/palmleaf3.png')} style={styles.headerImageBottomRight(isRTL)} resizeMode="contain" />
                         <Text style={styles.title(theme, isRTL)}>{t('headerTitle')}</Text>
@@ -208,13 +207,12 @@ const styles = {
     safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     header: (theme) => ({ backgroundColor: theme.primary, height: height * 0.35, borderBottomLeftRadius: 50, borderBottomRightRadius: 50, justifyContent: 'flex-start', paddingHorizontal: 30, paddingTop: 60, position: 'relative', overflow: 'hidden' }),
     
-    // التعديل هنا: إذا كان عربي (isRTL) تنتقل لليمين وتنعكس أفقياً
     headerImageTopLeft: (isRTL) => ({
         position: 'absolute',
         top: -60,
         ...(isRTL 
-            ? { right: -70, transform: [{ scaleX: -1 }] } // عربي: يمين + عكس الصورة
-            : { left: -70 }                                // إنجليزي: يسار عادي
+            ? { right: -70, transform: [{ scaleX: -1 }] } 
+            : { left: -70 }
         ),
         width: 290,
         height: 290,
@@ -223,7 +221,15 @@ const styles = {
     
     headerImageBottomRight: (isRTL) => ({ position: 'absolute', bottom: -7, ...(isRTL ? { left: 20 } : { right: 20 }), width: 130, height: 130, zIndex: 2 }),
     title: (theme, isRTL) => ({ fontSize: 42, fontWeight: 'bold', color: theme.headerText, textAlign: isRTL ? 'right' : 'left' }),
-    subtitle: (theme, isRTL) => ({ fontSize: 18, color: theme.headerText, marginTop: 5, textAlign: isRTL ? 'right' : 'left' }),
+    
+    // تم التعديل هنا: رفع النص في حالة اللغة العربية فقط
+    subtitle: (theme, isRTL) => ({ 
+        fontSize: 18, 
+        color: theme.headerText, 
+        marginTop: isRTL ? -50 : 5, // لو عربي يرفع لفوق (-15)، لو إنجليزي يسيب مسافة (5)
+        textAlign: isRTL ? 'right' : 'left' 
+    }),
+    
     formContainer: { flex: 1, paddingHorizontal: 20, marginTop: -40, zIndex: 1 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 30, paddingVertical: 30, paddingHorizontal: 25, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 15, marginBottom: 20 }),
     loginTitle: (theme) => ({ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 20, textAlign: 'center' }),
