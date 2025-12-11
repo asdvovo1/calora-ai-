@@ -146,7 +146,7 @@ const DarkModeToggle = ({ value, onValueChange, isRTL }) => {
   // لو إنجليزي: يتحرك من 0 لـ 22 (من الشمال لليمين)
   const translateX = animation.interpolate({ 
       inputRange: [0, 1], 
-      outputRange: isRTL ? [-13, 13] : [0, 22] 
+      outputRange: isRTL ? [-13, 13] : [13, -12] 
   });
 
   return (

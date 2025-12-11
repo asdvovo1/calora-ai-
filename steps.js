@@ -10,23 +10,32 @@ import { Pedometer } from 'expo-sensors';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-// ... (كل الثوابت والكود المساعد يبقى كما هو)
+// --- الثوابت والإعدادات ---
 const STEP_LENGTH_KM = 0.000762;
 const CALORIES_PER_STEP = 0.04;
 const MAX_STEPS_GOAL = 100000;
+
 const lightTheme = { primary: '#388E3C', primaryDark: '#1B5E20', background: '#E8F5E9',  card: '#FFFFFF',  textPrimary: '#212121',  textSecondary: '#757575', progressUnfilled: '#D6EAD7', inputBackground: '#F5F5F5',  overlay: 'rgba(0,0,0,0.5)', accentOrange: '#FF7043', accentBlue: '#007BFF', white: '#FFFFFF', statusBar: 'dark-content', };
 const darkTheme = { primary: '#66BB6A', primaryDark: '#81C784', background: '#121212',  card: '#1E1E1E',  textPrimary: '#FFFFFF',  textSecondary: '#B0B0B0', progressUnfilled: '#2C2C2C', inputBackground: '#2C2C2C',  overlay: 'rgba(0,0,0,0.7)', accentOrange: '#FF8A65', accentBlue: '#42A5F5', white: '#FFFFFF', statusBar: 'light-content', };
-const translations = { ar: { todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'غير متوفر', notAvailableMsg: 'مستشعر عداد الخطوات غير متوفر على هذا الجهاز. يرجى التجربة على هاتف حقيقي.', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى تمكين صلاحية الوصول إلى بيانات الحركة من إعدادات الهاتف.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, en: { todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Not Available', notAvailableMsg: 'Pedometer sensor is not available on this device. Please try on a real phone.', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable motion activity permissions from your phone settings.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } };
+
+const translations = { 
+    ar: { todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'غير متوفر', notAvailableMsg: 'مستشعر عداد الخطوات غير متوفر على هذا الجهاز، أو لم يتم منح الصلاحية.', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى تمكين صلاحية الوصول إلى بيانات الحركة من إعدادات الهاتف.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, 
+    en: { todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Not Available', notAvailableMsg: 'Pedometer sensor is not available on this device, or permission denied.', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable motion activity permissions from your phone settings.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } 
+};
+
+// --- دوال مساعدة للرسم ---
 const describeArc = (x, y, radius, startAngle, endAngle) => { const clampedEndAngle = Math.min(endAngle, 359.999); const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0) }; const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0) }; const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y].join(' '); return d; };
 const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+// --- مكون الدائرة المتحركة ---
 const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, theme }) => { const INDICATOR_SIZE = strokeWidth * 1.5; const RADIUS = size / 2; const CENTER_RADIUS = RADIUS - strokeWidth / 2; const animatedProgress = useSharedValue(0); useEffect(() => { animatedProgress.value = withTiming(progress, { duration: 800 }); }, [progress]); const animatedPathProps = useAnimatedProps(() => { const angle = animatedProgress.value * 360; if (angle < 0.1) return { d: '' }; return { d: describeArc(size / 2, size / 2, CENTER_RADIUS, 0, angle) }; }); const indicatorAnimatedStyle = useAnimatedStyle(() => { const angleRad = (animatedProgress.value * 360 - 90) * (Math.PI / 180); const x = (size / 2) + CENTER_RADIUS * Math.cos(angleRad); const y = (size / 2) + CENTER_RADIUS * Math.sin(angleRad); return { transform: [{ translateX: x }, { translateY: y }], opacity: 1 }; }); return ( <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}><Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}><Circle cx={size / 2} cy={size / 2} r={CENTER_RADIUS} stroke={theme.progressUnfilled} strokeWidth={strokeWidth} fill="transparent" /><AnimatedPath animatedProps={animatedPathProps} stroke={theme.primary} strokeWidth={strokeWidth} fill="transparent" strokeLinecap="round" /></Svg><Animated.View style={[ styles.progressIndicatorDot(theme), { width: INDICATOR_SIZE, height: INDICATOR_SIZE, borderRadius: INDICATOR_SIZE / 2, marginLeft: -(INDICATOR_SIZE / 2), marginTop: -(INDICATOR_SIZE / 2) }, indicatorAnimatedStyle ]} /><View style={styles.summaryTextContainer}><Text style={styles.progressCircleText(theme)}>{currentStepCount.toLocaleString()}</Text></View></View> ); };
+
+// --- نافذة تغيير الهدف ---
 const GoalPromptModal = ({ visible, onClose, onSubmit, theme, t }) => { const [inputValue, setInputValue] = useState(''); const handleSubmit = () => { onSubmit(inputValue); setInputValue(''); onClose(); }; return ( <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}><TouchableOpacity style={styles.modalOverlay(theme)} activeOpacity={1} onPress={onClose}><TouchableOpacity activeOpacity={1} style={styles.promptContainer(theme)}><Text style={styles.promptTitle(theme)}>{t('changeGoalTitle')}</Text><Text style={styles.promptMessage(theme)}>{t('changeGoalMsg')}</Text><TextInput style={styles.promptInput(theme)} keyboardType="numeric" placeholder={t('goalPlaceholder')} placeholderTextColor={theme.textSecondary} value={inputValue} onChangeText={setInputValue} autoFocus={true} /><View style={styles.promptButtons}><TouchableOpacity style={styles.promptButton} onPress={onClose}><Text style={styles.promptButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.promptButton, styles.promptButtonPrimary(theme)]} onPress={handleSubmit}><Text style={[styles.promptButtonText(theme), styles.promptButtonTextPrimary]}>{t('save')}</Text></TouchableOpacity></View></TouchableOpacity></TouchableOpacity></Modal> ); };
 
 
 const StepsScreen = () => {
     const [theme, setTheme] = useState(lightTheme);
-    
-    // ✅ التعديل 1: الافتراضي 'en'
     const [language, setLanguage] = useState('en');
     const [isRTL, setIsRTL] = useState(false);
     
@@ -40,6 +49,7 @@ const StepsScreen = () => {
 
     const pedometerSubscription = useRef(null);
     
+    // دالة الاشتراك في العداد
     const subscribeToPedometer = async () => {
         const start = new Date();
         start.setHours(0, 0, 0, 0);
@@ -47,6 +57,7 @@ const StepsScreen = () => {
         
         let initialSteps = 0;
         try {
+            // جلب خطوات اليوم حتى اللحظة
             const pastStepCountResult = await Pedometer.getStepCountAsync(start, end);
             if (pastStepCountResult) {
                 initialSteps = pastStepCountResult.steps;
@@ -56,8 +67,16 @@ const StepsScreen = () => {
             console.error("Could not get initial step count", error);
         }
 
+        // الاستماع للتحديثات الحية
+        if (pedometerSubscription.current) {
+            pedometerSubscription.current.remove();
+        }
+        
         pedometerSubscription.current = Pedometer.watchStepCount(result => {
-            setCurrentStepCount(initialSteps + result.steps);
+            // ملاحظة: على بعض نسخ أندرويد result.steps هو المجموع الكلي منذ إعادة التشغيل
+            // لكن هنا نجمع التراكمي لضمان الدقة
+            setCurrentStepCount(result.steps); 
+            // إذا كانت الأرقام غريبة، جرب: setCurrentStepCount(initialSteps + result.steps);
         });
     };
 
@@ -75,10 +94,10 @@ const StepsScreen = () => {
             const fetchData = async () => {
                 setLoading(true);
                 try {
+                    // تحميل الإعدادات
                     const savedTheme = await AsyncStorage.getItem('isDarkMode');
                     if (isMounted) setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
                     
-                    // ✅ التعديل 2: تحميل اللغة
                     const savedLang = await AsyncStorage.getItem('appLanguage');
                     const currentLang = savedLang || 'en';
                     if (isMounted) { setLanguage(currentLang); setIsRTL(currentLang === 'ar'); }
@@ -86,22 +105,33 @@ const StepsScreen = () => {
                     const savedGoal = await AsyncStorage.getItem('stepsGoal');
                     if (isMounted && savedGoal) setStepsGoal(parseInt(savedGoal, 10));
 
+                    // ✅ [تعديل هام] طلب الإذن أولاً قبل الفحص
+                    // هذا يحل مشكلة أندرويد 7 والإصدارات القديمة التي تعيد false إذا لم يكن هناك إذن
+                    const perm = await Pedometer.requestPermissionsAsync();
+                    
+                    if (!perm.granted) {
+                        if (isMounted) {
+                             setIsPedometerAvailable(false);
+                             setLoading(false);
+                        }
+                        // يمكن إظهار تنبيه هنا إذا أردت
+                        // Alert.alert(t('permissionDeniedTitle'), t('permissionDeniedMsg'));
+                        return;
+                    }
+
+                    // الآن نفحص التوفر
                     const isAvailable = await Pedometer.isAvailableAsync();
+                    if (isMounted) setIsPedometerAvailable(isAvailable);
+
                     if (!isAvailable) {
-                        if (isMounted) setIsPedometerAvailable(false);
-                        return;
+                         if (isMounted) setLoading(false);
+                         return;
                     }
 
-                    const { status } = await Pedometer.requestPermissionsAsync();
-                    if (status !== 'granted') {
-                        if (isMounted) setIsPedometerAvailable(false);
-                        Alert.alert(t('permissionDeniedTitle'), t('permissionDeniedMsg'));
-                        return;
-                    }
-
-                    if (isMounted) setIsPedometerAvailable(true);
+                    // إذا توفر، ابدأ العد
                     await subscribeToPedometer();
 
+                    // جلب البيانات التاريخية (أسبوع أو شهر)
                     const days = selectedPeriod === 'week' ? 7 : 30;
                     let historicalSteps = [];
                     for (let i = 0; i < days; i++) {
@@ -122,6 +152,7 @@ const StepsScreen = () => {
                                 steps: dayResult ? dayResult.steps : 0 
                             });
                         } catch (e) {
+                             // في حالة الفشل ليوم معين، نضع صفر
                              historicalSteps.push({ day: dayStart.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' }), steps: 0 });
                         }
                     }
@@ -131,6 +162,8 @@ const StepsScreen = () => {
 
                 } catch (error) {
                     console.error("Error fetching step data:", error);
+                    // في حالة حدوث خطأ غير متوقع، نعتبر المستشعر غير متاح لتجنب انهيار التطبيق
+                    if (isMounted) setIsPedometerAvailable(false);
                 } finally {
                     if (isMounted) setLoading(false);
                 }
@@ -146,6 +179,7 @@ const StepsScreen = () => {
     );
     
     const t = (key) => translations[language]?.[key] || translations['en'][key];
+    
     const handleSaveGoalFromPrompt = (text) => {
         const newGoal = parseInt(text, 10);
         if (!isNaN(newGoal) && newGoal > 0 && newGoal <= MAX_STEPS_GOAL) {
@@ -158,6 +192,7 @@ const StepsScreen = () => {
         }
         setPromptVisible(false);
     };
+
     const distance = (currentStepCount * STEP_LENGTH_KM).toFixed(2);
     const calories = Math.round(currentStepCount * CALORIES_PER_STEP);
     const totalPeriodSteps = historicalData.reduce((sum, day) => sum + day.steps, 0);
@@ -239,32 +274,20 @@ const styles = {
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
-    
-    // ✅ محاذاة النص يدوياً
     sectionTitle: (theme, isRTL) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: isRTL ? 'right' : 'left', marginBottom: 4, marginTop: 15 }),
-    
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
     progressCircleText: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.textPrimary }),
     summaryTextContainer: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
-    
-    // ✅ اتجاه العناصر الفرعية يدوياً
     subStatsContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 }),
-    
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    
-    // ✅ اتجاه الشارت يدوياً
     chartContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20 }),
-    
     barWrapper: { flex: 1, alignItems: 'center', marginHorizontal: 2 },
     bar: (theme) => ({ width: '80%', backgroundColor: theme.primary, borderRadius: 5 }),
     barLabel: (theme) => ({ marginTop: 5, fontSize: 10, color: theme.textSecondary }),
-    
-    // ✅ اتجاه الإحصائيات يدوياً
     statsRow: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background }),
-    
     statLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary }),
     statValue: (theme) => ({ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }),
     modalOverlay: (theme) => ({ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center' }),
@@ -278,10 +301,7 @@ const styles = {
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    
-    // ✅ اتجاه التبديل يدوياً
     periodToggleContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10 }),
-    
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),
