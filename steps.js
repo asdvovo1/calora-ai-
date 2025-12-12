@@ -27,8 +27,77 @@ const translations = {
 const describeArc = (x, y, radius, startAngle, endAngle) => { const clampedEndAngle = Math.min(endAngle, 359.999); const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0) }; const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0) }; const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y].join(' '); return d; };
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-// --- مكون الدائرة المتحركة ---
-const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, theme }) => { const INDICATOR_SIZE = strokeWidth * 1.5; const RADIUS = size / 2; const CENTER_RADIUS = RADIUS - strokeWidth / 2; const animatedProgress = useSharedValue(0); useEffect(() => { animatedProgress.value = withTiming(progress, { duration: 800 }); }, [progress]); const animatedPathProps = useAnimatedProps(() => { const angle = animatedProgress.value * 360; if (angle < 0.1) return { d: '' }; return { d: describeArc(size / 2, size / 2, CENTER_RADIUS, 0, angle) }; }); const indicatorAnimatedStyle = useAnimatedStyle(() => { const angleRad = (animatedProgress.value * 360 - 90) * (Math.PI / 180); const x = (size / 2) + CENTER_RADIUS * Math.cos(angleRad); const y = (size / 2) + CENTER_RADIUS * Math.sin(angleRad); return { transform: [{ translateX: x }, { translateY: y }], opacity: 1 }; }); return ( <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}><Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}><Circle cx={size / 2} cy={size / 2} r={CENTER_RADIUS} stroke={theme.progressUnfilled} strokeWidth={strokeWidth} fill="transparent" /><AnimatedPath animatedProps={animatedPathProps} stroke={theme.primary} strokeWidth={strokeWidth} fill="transparent" strokeLinecap="round" /></Svg><Animated.View style={[ styles.progressIndicatorDot(theme), { width: INDICATOR_SIZE, height: INDICATOR_SIZE, borderRadius: INDICATOR_SIZE / 2, marginStart: -(INDICATOR_SIZE / 2), marginTop: -(INDICATOR_SIZE / 2) }, indicatorAnimatedStyle ]} /><View style={styles.summaryTextContainer}><Text style={styles.progressCircleText(theme)}>{currentStepCount.toLocaleString()}</Text></View></View> ); };
+// --- مكون الدائرة المتحركة (تم تصحيح موضع النقطة هنا) ---
+const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, theme }) => { 
+    const INDICATOR_SIZE = strokeWidth * 1.5; 
+    const RADIUS = size / 2; 
+    const CENTER_RADIUS = RADIUS - strokeWidth / 2; 
+    const animatedProgress = useSharedValue(0); 
+    
+    useEffect(() => { 
+        animatedProgress.value = withTiming(progress, { duration: 800 }); 
+    }, [progress]); 
+    
+    const animatedPathProps = useAnimatedProps(() => { 
+        const angle = animatedProgress.value * 360; 
+        if (angle < 0.1) return { d: '' }; 
+        return { d: describeArc(size / 2, size / 2, CENTER_RADIUS, 0, angle) }; 
+    }); 
+    
+    const indicatorAnimatedStyle = useAnimatedStyle(() => { 
+        const angleRad = (animatedProgress.value * 360 - 90) * (Math.PI / 180); 
+        const xCenter = (size / 2) + CENTER_RADIUS * Math.cos(angleRad);
+        const yCenter = (size / 2) + CENTER_RADIUS * Math.sin(angleRad);
+        
+        // ** التعديل هنا: قيمة الإزاحة الأفقية. (موجب = لليمين، سالب = لليسار)**
+        const HORIZONTAL_OFFSET = -155; 
+        
+        return { 
+            transform: [
+                // إضافة الإزاحة الأفقية إلى translateX
+                { translateX: xCenter - INDICATOR_SIZE / 2 + HORIZONTAL_OFFSET }, 
+                { translateY: yCenter - INDICATOR_SIZE / 2 }
+            ], 
+            opacity: 1 
+        };
+    }); 
+
+    return ( 
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+            <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                <Circle 
+                    cx={size / 2} 
+                    cy={size / 2} 
+                    r={CENTER_RADIUS} 
+                    stroke={theme.progressUnfilled} 
+                    strokeWidth={strokeWidth} 
+                    fill="transparent" 
+                />
+                <AnimatedPath 
+                    animatedProps={animatedPathProps} 
+                    stroke={theme.primary} 
+                    strokeWidth={strokeWidth} 
+                    fill="transparent" 
+                    strokeLinecap="round" 
+                />
+            </Svg>
+            <Animated.View 
+                style={[ 
+                    styles.progressIndicatorDot(theme), 
+                    { 
+                        width: INDICATOR_SIZE, 
+                        height: INDICATOR_SIZE, 
+                        borderRadius: INDICATOR_SIZE / 2, 
+                    }, 
+                    indicatorAnimatedStyle 
+                ]} 
+            />
+            <View style={styles.summaryTextContainer}>
+                <Text style={styles.progressCircleText(theme)}>{currentStepCount.toLocaleString()}</Text>
+            </View>
+        </View> 
+    ); 
+};
 
 // --- نافذة تغيير الهدف ---
 const GoalPromptModal = ({ visible, onClose, onSubmit, theme, t }) => { const [inputValue, setInputValue] = useState(''); const handleSubmit = () => { onSubmit(inputValue); setInputValue(''); onClose(); }; return ( <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}><TouchableOpacity style={styles.modalOverlay(theme)} activeOpacity={1} onPress={onClose}><TouchableOpacity activeOpacity={1} style={styles.promptContainer(theme)}><Text style={styles.promptTitle(theme)}>{t('changeGoalTitle')}</Text><Text style={styles.promptMessage(theme)}>{t('changeGoalMsg')}</Text><TextInput style={styles.promptInput(theme)} keyboardType="numeric" placeholder={t('goalPlaceholder')} placeholderTextColor={theme.textSecondary} value={inputValue} onChangeText={setInputValue} autoFocus={true} /><View style={styles.promptButtons}><TouchableOpacity style={styles.promptButton} onPress={onClose}><Text style={styles.promptButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.promptButton, styles.promptButtonPrimary(theme)]} onPress={handleSubmit}><Text style={[styles.promptButtonText(theme), styles.promptButtonTextPrimary]}>{t('save')}</Text></TouchableOpacity></View></TouchableOpacity></TouchableOpacity></Modal> ); };
@@ -227,12 +296,19 @@ const StepsScreen = () => {
             <>
                 <AnimatedStepsCircle size={180} strokeWidth={15} currentStepCount={currentStepCount} progress={stepsGoal > 0 ? currentStepCount / stepsGoal : 0} theme={theme} />
                 <View style={styles.subStatsContainer}>
-                    <View style={styles.subStatBox}><MaterialCommunityIcons name="map-marker-distance" size={24} color={theme.primary} /><Text style={styles.subStatText(theme)}>{distance}{t('kmUnit')}</Text></View>
-                    <View style={styles.subStatBox}><MaterialCommunityIcons name="fire" size={24} color={theme.accentOrange} /><Text style={styles.subStatText(theme)}>{calories}{t('calUnit')}</Text></View>
+                    {/* تم عكس الترتيب ليتناسب مع الصورة الأصلية (RTL) */}
                     <TouchableOpacity style={styles.subStatBox} onPress={() => setPromptVisible(true)}>
                         <MaterialCommunityIcons name="flag-checkered" size={24} color={theme.accentBlue} />
                         <Text style={styles.subStatText(theme)}>{stepsGoal.toLocaleString()}</Text>
                     </TouchableOpacity>
+                    <View style={styles.subStatBox}>
+                        <MaterialCommunityIcons name="fire" size={24} color={theme.accentOrange} />
+                        <Text style={styles.subStatText(theme)}>{calories}{t('calUnit')}</Text>
+                    </View>
+                    <View style={styles.subStatBox}>
+                        <MaterialCommunityIcons name="map-marker-distance" size={24} color={theme.primary} />
+                        <Text style={styles.subStatText(theme)}>{distance}{t('kmUnit')}</Text>
+                    </View>
                 </View>
             </>
         );
@@ -249,8 +325,9 @@ const StepsScreen = () => {
                 </View>
                 <View style={styles.card(theme)}>
                     <View style={styles.periodToggleContainer(theme)}>
-                        <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'week' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('week')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'week' && styles.activePeriodText(theme)]}>{t('last7Days')}</Text></TouchableOpacity>
+                        {/* عكس الترتيب ليتناسب مع الـ RTL والصورة الأصلية */}
                         <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'month' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('month')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'month' && styles.activePeriodText(theme)]}>{t('last30Days')}</Text></TouchableOpacity>
+                        <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'week' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('week')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'week' && styles.activePeriodText(theme)]}>{t('last7Days')}</Text></TouchableOpacity>
                     </View>
                     <Text style={styles.sectionTitle(theme)}>{t('periodSummary').replace('{period}', periodLabel)}</Text>
                     {loading ? <ActivityIndicator color={theme.primary}/> : historicalData.length > 0 ? 
@@ -287,7 +364,7 @@ const styles = {
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
-    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', marginBottom: 4, marginTop: 15 }),
+    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'right', marginBottom: 4, marginTop: 15 }), // تم تغيير textAlign إلى right لتناسب RTL
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
@@ -296,7 +373,7 @@ const styles = {
     subStatsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 },
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20 },
+    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'rtl' }, // تم إضافة direction: 'rtl'
     
     barWrapper: { flex: 1, alignItems: 'center' }, 
     barLabel: (theme) => ({ 
@@ -307,7 +384,7 @@ const styles = {
     }),
 
     bar: (theme) => ({ backgroundColor: theme.primary, borderRadius: 5 }),
-    statsRow: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background }),
+    statsRow: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background, direction: 'rtl' }),
     statLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary }),
     statValue: (theme) => ({ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }),
     modalOverlay: (theme) => ({ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center' }),
@@ -320,8 +397,9 @@ const styles = {
     promptButtonPrimary: (theme) => ({ backgroundColor: theme.primary }),
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
+    // تم حذف الهوامش السالبة من هنا، لأن التصحيح تم داخل useAnimatedStyle
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10 }),
+    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'rtl' }), // تم إضافة direction: 'rtl'
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),
