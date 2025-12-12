@@ -95,25 +95,18 @@ async function registerForPushNotificationsAsync() { if (Platform.OS === 'androi
 
 const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, language }) => {
     const isArabic = language === 'ar';
-    // تحديد بداية الأسبوع: السبت للعربي (6)، الأحد للإنجليزي (0)
     const startOfWeekIndex = isArabic ? 6 : 0; 
 
-    // اتجاه العرض: يمين لليسار للعربي
-    const flexDirection = isArabic ? 'row-reverse' : 'row';
-
+    // ✅ إزالة الانعكاس اليدوي، الاعتماد على flexDirection: 'row'
     const handlePrevWeek = () => { const newDate = new Date(selectedDate); newDate.setDate(selectedDate.getDate() - 7); onDateSelect(newDate); };
     const handleNextWeek = () => { const newDate = new Date(selectedDate); newDate.setDate(selectedDate.getDate() + 7); onDateSelect(newDate); };
     
-    // مصفوفة أسماء الأيام ثابتة ومرتبة حسب ترتيب جافاسكريبت (0=الأحد، ... 6=السبت)
-    // هذا يضمن أننا نأخذ الاسم الصحيح دائماً بناءً على التاريخ
     const dayNamesMap = {
-        ar: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'], // أحد، اثنين، ثلاثاء... سبت
+        ar: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'], 
         en: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
     };
 
     const dates = [];
-    
-    // 1. حساب تاريخ بداية الأسبوع الحالي
     const currentDayIndex = selectedDate.getDay(); 
     const startDate = new Date(selectedDate);
     let diff = currentDayIndex - startOfWeekIndex;
@@ -122,7 +115,6 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
     startDate.setDate(selectedDate.getDate() - diff);
     startDate.setHours(0, 0, 0, 0);
 
-    // 2. توليد مصفوفة التواريخ (دائماً من بداية الأسبوع لنهايته)
     for (let i = 0; i < 7; i++) {
         const date = new Date(startDate);
         date.setDate(startDate.getDate() + i);
@@ -143,15 +135,15 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
 
     const isNextDisabled = startDate.getTime() >= todayWeekStart.getTime();
 
-    // دالة مساعدة لجلب اسم اليوم بناءً على التاريخ
     const getDayLabel = (date) => {
-        const dayIndex = date.getDay(); // يرجع رقم من 0 (الأحد) إلى 6 (السبت)
+        const dayIndex = date.getDay(); 
         return dayNamesMap[language === 'ar' ? 'ar' : 'en'][dayIndex];
     };
 
     return (
         <View style={styles.dateNavContainer(theme)}>
-            <View style={[styles.dateNavHeader, { flexDirection: flexDirection }]}>
+            {/* ✅ flexDirection: 'row' */}
+            <View style={[styles.dateNavHeader, { flexDirection: 'row' }]}>
                 <TouchableOpacity onPress={handlePrevWeek} style={styles.arrowButton}>
                     <Ionicons name={isArabic ? "chevron-forward-outline" : "chevron-back-outline"} size={24} color={theme.primary} />
                 </TouchableOpacity>
@@ -163,8 +155,8 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
                 </TouchableOpacity>
             </View>
 
-            {/* صف أسماء الأيام - يتم توليده من التواريخ مباشرة لضمان التطابق */}
-            <View style={[styles.weekContainer, { flexDirection: flexDirection }]}>
+            {/* ✅ flexDirection: 'row' */}
+            <View style={[styles.weekContainer, { flexDirection: 'row' }]}>
                 {displayDates.map((date, index) => (
                     <Text key={`day-${index}`} style={styles.weekDayText(theme)}>
                         {getDayLabel(date)}
@@ -172,8 +164,8 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
                 ))}
             </View>
             
-            {/* صف أرقام التواريخ */}
-            <View style={[styles.datesContainer, { flexDirection: flexDirection }]}>
+            {/* ✅ flexDirection: 'row' */}
+            <View style={[styles.datesContainer, { flexDirection: 'row' }]}>
                 {displayDates.map((date, index) => {
                     const normalizedDate = new Date(date);
                     normalizedDate.setHours(0, 0, 0, 0);
@@ -195,7 +187,6 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
 };
 
 const SummaryCard = ({ data, dailyGoal, theme, t }) => { 
-    // الدوائر لا تحتاج لعكس اتجاه عادة، ولكن النصوص داخلها تحتاج
     const SIZE = Dimensions.get('window').width * 0.5; 
     const STROKE_WIDTH = 18; const INDICATOR_SIZE = 24; const RADIUS = SIZE / 2; const CENTER_RADIUS = RADIUS - STROKE_WIDTH / 2; 
     const remaining = Math.round(dailyGoal - data.food + (data.exercise || 0)); 
@@ -225,17 +216,15 @@ const NutrientRow = ({ label, consumed, goal, color, unit = 'جم', isLimit = fa
     const isOverLimit = isLimit && consumed > goal; 
     const progressColor = isOverLimit ? theme.overLimit : color;
     const valueText = `${Math.round(consumed)} / ${goal} ${unit}`;
-    const isRTL = language === 'ar';
-    // عكس شريط التقدم إذا كان عربي
-    const transformStyle = { transform: [{ scaleX: isRTL ? -1 : 1 }] };
-
+    
+    // ✅ إزالة transform scaleX، الاعتماد على اتجاه النظام
     return (
         <View style={styles.nutrientRowContainer}>
-            <View style={[styles.nutrientRowHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.nutrientRowHeader, { flexDirection: 'row' }]}>
                 <Text style={styles.nutrientRowLabel(theme)}>{label}</Text>
                 <Text style={styles.nutrientRowValue(theme)}>{valueText}</Text>
             </View>
-            <View style={transformStyle}>
+            <View>
                 <Progress.Bar progress={goal > 0 ? consumed / goal : 0} width={null} color={progressColor} unfilledColor={`${progressColor}30`} borderWidth={0} height={8} borderRadius={4} />
             </View>
         </View>
@@ -256,26 +245,24 @@ const NutrientSummaryCard = ({ data, theme, t, language }) => {
 
 const FoodLogItem = ({ item, theme, t, showMacros = true, language }) => { 
     let imageSource = null; if (item.capturedImageUri) { imageSource = { uri: item.capturedImageUri }; } else if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:'))) { imageSource = { uri: item.image }; } else if (item.image) { imageSource = { uri: `https://spoonacular.com/cdn/ingredients_100x100/${item.image}` }; } 
-    const isRTL = language === 'ar';
-    const flexDirection = isRTL ? 'row-reverse' : 'row';
-    const textAlign = isRTL ? 'right' : 'left';
     
     return (
-        <View style={[styles.foodLogItemContainer, { flexDirection }]}>
-            {imageSource ? (<Image source={imageSource} style={[styles.foodLogItemImage, isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]} />) : (<View style={[styles.foodLogItemImagePlaceholder(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Ionicons name="restaurant-outline" size={24} color={theme.primary} /></View>)}
+        // ✅ استخدام flexDirection: 'row' واستبدال Margins بـ Start/End
+        <View style={[styles.foodLogItemContainer, { flexDirection: 'row' }]}>
+            {imageSource ? (<Image source={imageSource} style={[styles.foodLogItemImage, { marginEnd: 15 }]} />) : (<View style={[styles.foodLogItemImagePlaceholder(theme), { marginEnd: 15 }]}><Ionicons name="restaurant-outline" size={24} color={theme.primary} /></View>)}
             <View style={styles.foodLogItemDetails}>
-                <View style={[styles.foodLogItemHeader, { flexDirection }]}>
-                    <Text style={[styles.foodLogItemName(theme), { textAlign }]} numberOfLines={1}>{item.name}</Text>
+                <View style={[styles.foodLogItemHeader, { flexDirection: 'row' }]}>
+                    <Text style={[styles.foodLogItemName(theme), { textAlign: 'left' }]} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.foodLogItemCalories(theme)}>{Math.round(item.calories)} {t('kcal_unit')}</Text>
                 </View>
                 {showMacros && (
-                    <View style={[styles.foodLogItemMacros, { flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: isRTL ? 'flex-start' : 'flex-start' }]}>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.protein }}>{t('p_macro')}</Text>{Math.round(item.p || 0)}g</Text>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.carbs }}>{t('c_macro')}</Text>{Math.round(item.c || 0)}g</Text>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.fat }}>{t('f_macro')}</Text>{Math.round(item.f || 0)}g</Text>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.fiber }}>{t('fib_macro')}</Text>{Math.round(item.fib || 0)}g</Text>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.sugar }}>{t('sug_macro')}</Text>{Math.round(item.sug || 0)}g</Text>
-                        <Text style={[styles.macroText(theme), isRTL ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15 }]}><Text style={{ color: theme.sodium }}>{t('sod_macro')}</Text>{Math.round(item.sod || 0)}mg</Text>
+                    <View style={[styles.foodLogItemMacros, { flexDirection: 'row', justifyContent: 'flex-start' }]}>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.protein }}>{t('p_macro')}</Text>{Math.round(item.p || 0)}g</Text>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.carbs }}>{t('c_macro')}</Text>{Math.round(item.c || 0)}g</Text>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.fat }}>{t('f_macro')}</Text>{Math.round(item.f || 0)}g</Text>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.fiber }}>{t('fib_macro')}</Text>{Math.round(item.fib || 0)}g</Text>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.sugar }}>{t('sug_macro')}</Text>{Math.round(item.sug || 0)}g</Text>
+                        <Text style={[styles.macroText(theme), { marginEnd: 15 }]}><Text style={{ color: theme.sodium }}>{t('sod_macro')}</Text>{Math.round(item.sod || 0)}mg</Text>
                     </View>
                 )}
             </View>
@@ -291,11 +278,11 @@ const DailyFoodLog = ({ items, onPress, theme, t, language }) => {
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
             <View style={[styles.card(theme), styles.dailyLogCard]}>
-                <View style={[styles.dailyLogContentContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.dailyLogContentContainer, { flexDirection: 'row' }]}>
                     <Text style={styles.sectionTitle(theme)}>{t('dailyLogTitle')}</Text>
-                    <View style={[styles.dailyLogLeftContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.dailyLogLeftContainer, { flexDirection: 'row' }]}>
                         {!isEmpty ? (
-                            <View style={[styles.foodPreviewContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.foodPreviewContainer, { flexDirection: 'row' }]}>
                                 {items.length > MAX_PREVIEW_IMAGES && (
                                     <View style={[styles.previewCounterCircle(theme), { zIndex: 0 }]}>
                                         <Text style={styles.previewCounterText(theme)}>+{items.length - MAX_PREVIEW_IMAGES}</Text>
@@ -304,8 +291,8 @@ const DailyFoodLog = ({ items, onPress, theme, t, language }) => {
                                 {items.slice(0, MAX_PREVIEW_IMAGES).map((item, index) => { 
                                     const imageSource = getImageSource(item); 
                                     const zIndex = MAX_PREVIEW_IMAGES - index; 
-                                    // عكس الهوامش عشان الصور تتداخل صح
-                                    const marginStyle = isRTL ? { marginRight: -18, zIndex } : { marginStart: -18, zIndex }; 
+                                    // ✅ استخدام marginStart لعمل التداخل الصحيح
+                                    const marginStyle = { marginStart: -18, zIndex }; 
                                     return imageSource ? 
                                         (<Image key={`${item.id}-${index}`} source={imageSource} style={[styles.previewImage(theme), marginStyle]} />) : 
                                         (<View key={`${item.id}-${index}`} style={[styles.previewImage(theme), styles.previewImagePlaceholder(theme), marginStyle]}><Ionicons name="restaurant-outline" size={16} color={theme.primary} /></View>); 
@@ -322,14 +309,12 @@ const DailyFoodLog = ({ items, onPress, theme, t, language }) => {
 const MealLoggingSection = ({ title, iconName, items, onAddPress, mealKey, isEditable, theme, t, language }) => { 
     const totalCalories = items.reduce((sum, item) => sum + (item.calories || 0), 0); 
     const totalMacros = items.reduce((totals, item) => { totals.p += item.p || 0; totals.c += item.c || 0; totals.f += item.f || 0; totals.fib += item.fib || 0; totals.sug += item.sug || 0; totals.sod += item.sod || 0; return totals; }, { p: 0, c: 0, f: 0, fib: 0, sug: 0, sod: 0 }); 
-    const isRTL = language === 'ar';
-    const flexDirection = isRTL ? 'row-reverse' : 'row';
-
+    
     return (
         <View style={styles.card(theme)}>
-            <View style={[styles.mealSectionHeader, { flexDirection }]}>
-                <View style={[styles.mealSectionHeaderLeft, { flexDirection }]}>
-                    <Ionicons name={iconName} size={24} color={theme.primary} style={[styles.mealIcon, isRTL ? { marginLeft: 10, marginRight: 0 } : { marginRight: 10 }]} />
+            <View style={[styles.mealSectionHeader, { flexDirection: 'row' }]}>
+                <View style={[styles.mealSectionHeaderLeft, { flexDirection: 'row' }]}>
+                    <Ionicons name={iconName} size={24} color={theme.primary} style={[styles.mealIcon, { marginEnd: 10 }]} />
                     <Text style={styles.mealSectionTitle(theme)}>{title}</Text>
                 </View>
                 <Text style={styles.mealSectionTotalCalories(theme)}>{Math.round(totalCalories)} {t('kcal_unit')}</Text>
@@ -338,12 +323,12 @@ const MealLoggingSection = ({ title, iconName, items, onAddPress, mealKey, isEdi
             {items && items.length > 0 && items.map((item, index) => (<FoodLogItem key={`${item.id}-${index}`} item={item} showMacros={false} theme={theme} t={t} language={language} />))}
             
             {items && items.length > 0 && (
-                <View style={[styles.mealMacrosContainer(theme), { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.mealMacrosContainer(theme), { flexDirection: 'row' }]}>
                     {['fat', 'carbs', 'protein', 'sugar', 'fiber', 'sodium'].map((macroKey, idx) => {
                         const val = macroKey === 'sodium' ? totalMacros.sod : (macroKey === 'sugar' ? totalMacros.sug : (macroKey === 'fiber' ? totalMacros.fib : (macroKey === 'protein' ? totalMacros.p : (macroKey === 'carbs' ? totalMacros.c : totalMacros.f))));
                         const unit = macroKey === 'sodium' ? t('mg_unit') : t('g_unit');
                         return (
-                             <View key={idx} style={[styles.macroSummaryItem, isRTL ? { marginLeft: 20, marginRight: 0 } : { marginRight: 20 }]}>
+                             <View key={idx} style={[styles.macroSummaryItem, { marginEnd: 20 }]}>
                                 <Text style={styles.macroSummaryText(theme)}>{t(macroKey)}: {Math.round(val)} {unit}</Text>
                             </View>
                         );
@@ -367,33 +352,30 @@ const AddFoodModal = ({ visible, onClose, onFoodSelect, mealKey, theme, t, langu
     const handleSearch = async () => { if (!query.trim()) { Alert.alert(t('error'), t('search_error_msg')); return; } setLoading(true); setResults([]); try { const [egyptianResults, spoonacularResults] = await Promise.all([searchEgyptianFoodsWithImages(query), searchSpoonacular(query)]); setResults([...egyptianResults, ...spoonacularResults]); } catch (error) { Alert.alert(t('error'), t('fetch_error_msg')); } finally { setLoading(false); } }; 
     const handleSelectFood = async (selectedItem) => { if (selectedItem.source === 'local') { onFoodSelect(selectedItem); handleClose(); return; } setFetchingDetailsId(selectedItem.id); try { const response = await fetch(`https://api.spoonacular.com/food/ingredients/${selectedItem.id}/information?amount=100&unit=g&apiKey=${SPOONACULAR_API_KEY}`); const data = await response.json(); if (data.nutrition && data.nutrition.nutrients) { const nutrition = data.nutrition.nutrients; const finalFoodItem = { id: data.id, name: data.name, quantity: '100g', calories: Math.round(nutrition.find(n => n.name === 'Calories')?.amount || 0), p: Math.round(nutrition.find(n => n.name === 'Protein')?.amount || 0), c: Math.round(nutrition.find(n => n.name === 'Carbohydrates')?.amount || 0), f: Math.round(nutrition.find(n => n.name === 'Fat')?.amount || 0), fib: Math.round(nutrition.find(n => n.name === 'Fiber')?.amount || 0), sug: Math.round(nutrition.find(n => n.name === 'Sugar')?.amount || 0), sod: Math.round(nutrition.find(n => n.name === 'Sodium')?.amount || 0), image: selectedItem.image, }; onFoodSelect(finalFoodItem); handleClose(); } else { Alert.alert(t('error'), t('fetch_error_msg')); } } catch (error) { console.error("Spoonacular Details API Error:", error); Alert.alert(t('error'), t('fetch_error_msg')); } finally { setFetchingDetailsId(null); } }; 
     
-    const isRTL = language === 'ar';
-    const flexDirection = isRTL ? 'row-reverse' : 'row';
-    const textAlign = isRTL ? 'right' : 'left';
-
     return (
         <Modal visible={visible} onRequestClose={handleClose} animationType="slide" transparent={true}>
             <View style={styles.modalOverlay}>
                 <View style={styles.modalView(theme)}>
-                    <View style={[styles.modalHeader(theme), { flexDirection }]}>
+                    <View style={[styles.modalHeader(theme), { flexDirection: 'row' }]}>
                         <Text style={styles.modalTitle(theme)}>{t('add_to')} {mealTitle}</Text>
                         <TouchableOpacity onPress={handleClose}><Ionicons name="close-circle" size={30} color={theme.primary} /></TouchableOpacity>
                     </View>
-                    <View style={[styles.searchContainer, { flexDirection }]}>
-                        <TextInput style={[styles.searchInput(theme), { textAlign }]} placeholder={t('search_placeholder')} value={query} onChangeText={setQuery} placeholderTextColor={theme.textSecondary} returnKeyType="search" onSubmitEditing={handleSearch} />
-                        <TouchableOpacity style={[styles.searchButton(theme), isRTL ? { marginRight: 10, marginLeft: 0 } : { marginLeft: 10 }]} onPress={handleSearch}><Ionicons name="search" size={24} color={theme.white} /></TouchableOpacity>
+                    <View style={[styles.searchContainer, { flexDirection: 'row' }]}>
+                        {/* ✅ textAlign: 'left' سيصبح يمين تلقائياً */}
+                        <TextInput style={[styles.searchInput(theme), { textAlign: 'left' }]} placeholder={t('search_placeholder')} value={query} onChangeText={setQuery} placeholderTextColor={theme.textSecondary} returnKeyType="search" onSubmitEditing={handleSearch} />
+                        <TouchableOpacity style={[styles.searchButton(theme), { marginStart: 10 }]} onPress={handleSearch}><Ionicons name="search" size={24} color={theme.white} /></TouchableOpacity>
                     </View>
                     {loading ? (<ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />) : (
                         <FlatList 
                             data={results} 
                             keyExtractor={(item, index) => `${item.id}-${index}`} 
                             renderItem={({ item }) => (
-                                <TouchableOpacity style={[styles.resultItem, { flexDirection }]} onPress={() => handleSelectFood(item)} disabled={fetchingDetailsId !== null}>
-                                    <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                                <TouchableOpacity style={[styles.resultItem, { flexDirection: 'row' }]} onPress={() => handleSelectFood(item)} disabled={fetchingDetailsId !== null}>
+                                    <View style={{ flex: 1, alignItems: 'flex-start' }}>
                                         <Text style={styles.foodName(theme)}>{item.name}</Text>
                                         {item.source === 'local' && <Text style={{color: theme.primary, fontSize: 12}}>{t('local_food')}</Text>}
                                     </View>
-                                    {fetchingDetailsId === item.id ? (<ActivityIndicator size="small" color={theme.primary} style={isRTL ? { marginRight: 15 } : { marginStart: 15 }} />) : (<Ionicons name="add-circle-outline" size={28} color={theme.primary} style={isRTL ? { marginRight: 15 } : { marginStart: 15 }} />)}
+                                    {fetchingDetailsId === item.id ? (<ActivityIndicator size="small" color={theme.primary} style={{ marginStart: 15 }} />) : (<Ionicons name="add-circle-outline" size={28} color={theme.primary} style={{ marginStart: 15 }} />)}
                                 </TouchableOpacity>
                             )} 
                             ListEmptyComponent={!loading && query.length > 0 ? <Text style={styles.emptyText(theme)}>{t('no_results')}</Text> : null} 
@@ -406,28 +388,26 @@ const AddFoodModal = ({ visible, onClose, onFoodSelect, mealKey, theme, t, langu
 };
 
 const SmallWeightCard = ({ weight, onPress, theme, t, language }) => {
-    const isRTL = language === 'ar';
     return (
         <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
-            <View style={[styles.smallCardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.smallCardHeader, { flexDirection: 'row' }]}>
                 <View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="barbell-outline" size={20} color={theme.primary} /></View>
-                <Text style={[styles.smallCardTitle(theme), isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }]}>{t('weight')}</Text>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('weight')}</Text>
             </View>
-            <Text style={[styles.smallCardValue(theme), { textAlign: isRTL ? 'right' : 'left' }]}>{weight > 0 ? `${weight} ${t('kg_unit')}` : t('not_logged')}</Text>
+            <Text style={[styles.smallCardValue(theme), { textAlign: 'left' }]}>{weight > 0 ? `${weight} ${t('kg_unit')}` : t('not_logged')}</Text>
         </TouchableOpacity>
     );
 };
 
 const SmallWaterCard = ({ water, waterGoal, onPress, theme, t, language }) => { 
     const DISPLAY_DROPS = 15; const filledDrops = Math.min(water || 0, DISPLAY_DROPS); const totalDropsToDisplay = Math.min(waterGoal || DISPLAY_DROPS, DISPLAY_DROPS); const drops = Array.from({ length: totalDropsToDisplay }, (_, i) => i); 
-    const isRTL = language === 'ar';
     return (
         <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
-            <View style={[styles.smallCardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.smallCardHeader, { flexDirection: 'row' }]}>
                 <View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="water-outline" size={20} color={theme.primary} /></View>
-                <Text style={[styles.smallCardTitle(theme), isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }]}>{t('water')}</Text>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('water')}</Text>
             </View>
-            <View style={[styles.waterVisualizerContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.waterVisualizerContainer, { flexDirection: 'row' }]}>
                 {drops.map(index => (<Ionicons key={index} name={index < filledDrops ? 'water' : 'water-outline'} size={22} color={index < filledDrops ? '#007BFF' : theme.disabled} style={styles.waterDropIcon} />))}
             </View>
         </TouchableOpacity>
@@ -435,14 +415,13 @@ const SmallWaterCard = ({ water, waterGoal, onPress, theme, t, language }) => {
 };
 
 const SmallWorkoutCard = ({ totalCaloriesBurned = 0, onPress, theme, t, language }) => { 
-    const isRTL = language === 'ar';
     return ( 
         <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
-            <View style={[styles.smallCardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.smallCardHeader, { flexDirection: 'row' }]}>
                 <View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="run-fast" size={20} color={theme.primary} /></View>
-                <Text style={[styles.smallCardTitle(theme), isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }]}>{t('workouts')}</Text>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('workouts')}</Text>
             </View>
-            <View style={[styles.smallCardContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <View style={[styles.smallCardContent, { alignItems: 'flex-start' }]}>
                 <Text style={styles.smallCardValue(theme)}>{totalCaloriesBurned > 0 ? `🔥 ${Math.round(totalCaloriesBurned)}` : t('not_logged')}</Text>
                 {totalCaloriesBurned > 0 ? <Text style={styles.smallCardSubValue(theme)}>{t('burned_cal')}</Text> : null }
             </View>
@@ -454,12 +433,11 @@ const SmallStepsCard = ({ navigation, theme, t, language }) => {
     const [status, setStatus] = useState('checking'); const [currentStepCount, setCurrentStepCount] = useState(0); const [stepsGoal, setStepsGoal] = useState(10000); 
     useFocusEffect(useCallback(() => { const subscribe = async () => { const savedGoal = await AsyncStorage.getItem('stepsGoal'); if (savedGoal) setStepsGoal(parseInt(savedGoal, 10)); const isAvailable = await Pedometer.isAvailableAsync(); if (!isAvailable) { setStatus('unavailable'); return; } const { status: permissionStatus } = await Pedometer.requestPermissionsAsync(); if (permissionStatus !== 'granted') { setStatus('denied'); return; } const end = new Date(); const start = new Date(); start.setHours(0, 0, 0, 0); try { const pastStepCountResult = await Pedometer.getStepCountAsync(start, end); if (pastStepCountResult) setCurrentStepCount(pastStepCountResult.steps); setStatus('available'); } catch (error) { console.error("Pedometer error:", error); setStatus('unavailable'); } }; subscribe(); }, [])); 
     const renderContent = () => { if (status === 'checking') return <ActivityIndicator style={{ marginTop: 20 }} color={theme.primary} />; if (status === 'unavailable' || status === 'denied') return <Text style={[styles.smallCardValue(theme), { fontSize: 20, marginTop: 15 }]}>{t('unsupported')}</Text>; const progress = stepsGoal > 0 ? currentStepCount / stepsGoal : 0; return (<View style={styles.stepsCardContent}><View style={styles.stepsCardCircleContainer}><Progress.Circle size={80} progress={progress} showsText={false} color={theme.primary} unfilledColor={theme.progressUnfilled} borderWidth={0} thickness={8} /><View style={styles.stepsCardTextContainer}><Text style={styles.stepsCardCountText(theme)}>{currentStepCount.toLocaleString()}</Text></View></View><Text style={styles.stepsCardGoalText(theme)}>{t('goal')}{stepsGoal.toLocaleString()}</Text></View>); }; 
-    const isRTL = language === 'ar';
     return (
         <TouchableOpacity style={styles.smallCard(theme)} onPress={() => navigation.navigate('Steps')}>
-            <View style={[styles.smallCardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.smallCardHeader, { flexDirection: 'row' }]}>
                 <View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="walk" size={20} color={theme.primary} /></View>
-                <Text style={[styles.smallCardTitle(theme), isRTL ? { marginRight: 8, marginLeft: 0 } : { marginLeft: 8 }]}>{t('steps')}</Text>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('steps')}</Text>
             </View>
             {renderContent()}
         </TouchableOpacity>
@@ -467,9 +445,8 @@ const SmallStepsCard = ({ navigation, theme, t, language }) => {
 };
 
 const DashboardGrid = ({ weight, water, waterGoal, totalExerciseCalories, onWeightPress, onWaterPress, onWorkoutPress, navigation, theme, t, language }) => {
-    const isRTL = language === 'ar';
     return (
-        <View style={[styles.dashboardGridContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.dashboardGridContainer, { flexDirection: 'row' }]}>
             <SmallWeightCard weight={weight} onPress={onWeightPress} theme={theme} t={t} language={language} />
             <SmallWaterCard water={water} waterGoal={waterGoal} onPress={onWaterPress} theme={theme} t={t} language={language} />
             <SmallWorkoutCard totalCaloriesBurned={totalExerciseCalories} onPress={onWorkoutPress} theme={theme} t={t} language={language} />
@@ -501,9 +478,6 @@ function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) 
     const totalExerciseCalories = (dailyData.exercises || []).reduce((sum, ex) => sum + (ex.calories || 0), 0); 
     useEffect(() => { const progressMade = calculatedTotals.food > 0 || totalExerciseCalories > 0; setHasProgress(progressMade); }, [calculatedTotals.food, totalExerciseCalories, setHasProgress]); 
 
-    const isRTL = language === 'ar';
-    const alignStyle = isRTL ? { alignItems: 'flex-end', textAlign: 'right' } : { alignItems: 'flex-start', textAlign: 'left' };
-
     return ( 
         <SafeAreaView style={styles.rootContainer(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
@@ -511,18 +485,18 @@ function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) 
             <ScrollView contentContainerStyle={styles.container}>
                 <DateNavigator selectedDate={selectedDate} onDateSelect={setSelectedDate} referenceToday={referenceToday} theme={theme} t={t} language={language} />
                 {!isToday && (
-                    <View style={[styles.readOnlyBanner(theme), { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <Ionicons name="information-circle-outline" size={20} color={theme.white} style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }} />
-                        <Text style={[styles.readOnlyBannerText(theme), { textAlign: isRTL ? 'right' : 'left' }]}>{t('readOnlyBanner')}</Text>
+                    <View style={[styles.readOnlyBanner(theme), { flexDirection: 'row' }]}>
+                        <Ionicons name="information-circle-outline" size={20} color={theme.white} style={{ marginEnd: 8 }} />
+                        <Text style={[styles.readOnlyBannerText(theme), { textAlign: 'left' }]}>{t('readOnlyBanner')}</Text>
                     </View>
                 )}
                 <SummaryCard data={{ food: calculatedTotals.food, exercise: totalExerciseCalories }} dailyGoal={dailyGoal} theme={theme} t={t} />
                 <NutrientSummaryCard data={{ protein: { consumed: calculatedTotals.protein, goal: macroGoals.protein }, carbs: { consumed: calculatedTotals.carbs, goal: macroGoals.carbs }, fat: { consumed: calculatedTotals.fat, goal: macroGoals.fat }, fiber: { consumed: calculatedTotals.fiber, goal: NUTRIENT_GOALS.fiber }, sugar: { consumed: calculatedTotals.sugar, goal: NUTRIENT_GOALS.sugar }, sodium: { consumed: calculatedTotals.sodium, goal: NUTRIENT_GOALS.sodium }, }} theme={theme} t={t} language={language} />
                 <DashboardGrid weight={dailyData.displayWeight || 0} water={dailyData.water || 0} waterGoal={waterGoal} totalExerciseCalories={totalExerciseCalories} onWeightPress={() => navigation.navigate('Weight')} onWaterPress={() => navigation.navigate('Water', { dateKey: formatDateKey(selectedDate) })} onWorkoutPress={() => navigation.navigate('WorkoutLog', { dateKey: formatDateKey(selectedDate) })} navigation={navigation} theme={theme} t={t} language={language} />
                 <DailyFoodLog items={allFoodItems} onPress={() => navigation.navigate('FoodLogDetail', { items: allFoodItems, dateString: selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) })} theme={theme} t={t} language={language} />
-                <View style={[styles.sectionHeaderContainer, alignStyle]}>
-                    <Text style={[styles.sectionTitle(theme), { textAlign: isRTL ? 'right' : 'left' }]}>{t('mealSectionsTitle')}</Text>
-                    <Text style={[styles.sectionDescription(theme), { textAlign: isRTL ? 'right' : 'left' }]}>{t('mealSectionsDesc')}</Text>
+                <View style={[styles.sectionHeaderContainer, { alignItems: 'flex-start', textAlign: 'left' }]}>
+                    <Text style={[styles.sectionTitle(theme), { textAlign: 'left' }]}>{t('mealSectionsTitle')}</Text>
+                    <Text style={[styles.sectionDescription(theme), { textAlign: 'left' }]}>{t('mealSectionsDesc')}</Text>
                 </View>
                 <MealLoggingSection title={t('breakfast')} iconName="sunny-outline" items={dailyData.breakfast || []} onAddPress={handleOpenModal} mealKey="breakfast" isEditable={isToday} theme={theme} t={t} language={language} />
                 <MealLoggingSection title={t('lunch')} iconName="partly-sunny-outline" items={dailyData.lunch || []} onAddPress={handleOpenModal} mealKey="lunch" isEditable={isToday} theme={theme} t={t} language={language} />
@@ -542,21 +516,12 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language })
     const [profileImage, setProfileImage] = useState(null);
     const isRTL = language === 'ar';
 
-    // حساب موقع المؤشر بناءً على اللغة
-    // في RTL الـ Tab رقم 0 بيكون على اليمين (visual index = 3)
-    const getTabPosition = (index) => {
-        if (isRTL) {
-            return (TAB_COUNT - 1 - index) * TAB_WIDTH;
-        }
-        return index * TAB_WIDTH;
-    };
-
-    const translateX = useSharedValue(getTabPosition(state.index));
+    // ✅ تبسيط المنطق: نعتمد على النظام في قلب الإحداثيات عند استخدام I18nManager
+    const translateX = useSharedValue(state.index * TAB_WIDTH);
 
     useEffect(() => {
-        const targetPosition = getTabPosition(state.index);
-        translateX.value = withTiming(targetPosition, { duration: 300 }); 
-    }, [state.index, isRTL, TAB_WIDTH]);
+        translateX.value = withTiming(state.index * TAB_WIDTH, { duration: 300 }); 
+    }, [state.index, TAB_WIDTH]);
 
     useFocusEffect(useCallback(() => {
         const loadProfileImage = async () => {
@@ -572,10 +537,12 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language })
     const routes = state.routes;
 
     return (
-        <View style={[styles.tabBarContainer(theme), { direction: 'ltr', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        // ✅ direction: ltr ضروري هنا أحياناً للرسومات المعقدة، لكن في حالتك البسيطة يمكن إزالتها أو تركها
+        // الأفضل جعلها 'row' عادية وترك النظام يتصرف
+        <View style={[styles.tabBarContainer(theme), { flexDirection: 'row' }]}>
             <View style={styles.animationWrapper}><LeafAnimation trigger={state.index} /></View>
             
-            <Animated.View style={[styles.indicatorContainer, { width: TAB_WIDTH, direction: 'ltr' }, indicatorAnimatedStyle]}>
+            <Animated.View style={[styles.indicatorContainer, { width: TAB_WIDTH }, indicatorAnimatedStyle]}>
                 <View style={[styles.indicator(theme), { backgroundColor: theme.tabBarIndicator }]}>
                     <View style={[styles.cutout, styles.cutoutLeft(theme)]} />
                     <View style={[styles.cutout, styles.cutoutRight(theme)]} />
