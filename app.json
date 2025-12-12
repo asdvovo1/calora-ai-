@@ -59,6 +59,12 @@
         }
       ],
       [
+        "expo-localization",
+        {
+          "supportsRTL": true
+        }
+      ],
+      [
         "expo-sensors",
         {
           "motionPermission": "Allow Calora AI to access your device motion to track steps."
@@ -93,6 +99,7 @@
       "./plugins/withForceRtl.js"
     ],
     "extra": {
+      "supportsRTL": true,
       "eas": {
         "projectId": "c15bd2a0-4703-42bd-9145-d1f2a8d28b4e"
       }
