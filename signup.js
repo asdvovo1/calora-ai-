@@ -119,12 +119,14 @@ const SignUpScreen = ({ navigation, appLanguage }) => {
                     <View style={styles.card(theme)}>
                         <View style={styles.cardContent}>
                             
-                            {/* العنوان وزر الرجوع */}
+                            {/* تعديل مكان العنوان */}
                             <View style={styles.titleContainer(isRTL)}>
                                 <TouchableOpacity style={styles.backButton(isRTL)} onPress={() => navigation.goBack()}>
+                                    {/* السهم سيبقى يسار */}
                                     <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.textPrimary} />
                                 </TouchableOpacity>
-                                {/* تم تمرير isRTL هنا لتعديل المحاذاة */}
+                                
+                                {/* النص سيذهب لليمين لأننا سنعطيه flex: 1 و textAlign: right */}
                                 <Text style={styles.cardTitle(theme, isRTL)}>{t('cardTitle')}</Text>
                             </View>
 
@@ -221,36 +223,42 @@ const styles = {
         fontSize: 42, 
         fontWeight: 'bold', 
         color: theme.headerText, 
-        textAlign: isRTL ? 'right' : 'left', 
+        textAlign: isRTL ? 'left' : 'right', 
         width: '100%' 
     }),
     subtitle: (theme, isRTL) => ({ 
         fontSize: 18, 
         color: theme.headerText, 
         marginTop: 5, 
-        textAlign: isRTL ? 'right' : 'left', 
+        textAlign: isRTL ? 'left' : 'right', 
         width: '100%' 
     }),
     
     card: (theme) => ({ marginHorizontal: 20, marginTop: -40, marginBottom: 20, backgroundColor: theme.card, borderRadius: 30, paddingHorizontal: 25, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 15 }),
     cardContent: { justifyContent: 'center', paddingVertical: 25 },
     
-    // تم التعديل هنا: جعلناها row دائماً لكي يظل السهم يسار والنص يمين
+    // **التعديل الرئيسي هنا:**
+    // جعلنا flexDirection دائماً 'row' حتى يبقى السهم يسار والنص يمين
     titleContainer: (isRTL) => ({ 
         flexDirection: 'row', 
         alignItems: 'center', 
         marginBottom: 15 
     }),
     
-    backButton: (isRTL) => ({ padding: 5, marginRight: 10 }),
+    backButton: (isRTL) => ({ 
+        padding: 5, 
+        marginRight: 10 // مسافة تفصل السهم عن بداية مساحة النص
+    }),
     
-    // تم التعديل هنا: إضافة flex و textAlign
+    // **وهنا:**
+    // flex: 1 يجعل النص يمتد ليأخذ كل المساحة المتبقية
+    // textAlign: right في العربي يرمي الكلمة لأقصى اليمين
     cardTitle: (theme, isRTL) => ({ 
         fontSize: 28, 
         fontWeight: 'bold', 
         color: theme.textPrimary,
-        flex: 1,
-        textAlign: isRTL ? 'right' : 'left'
+        flex: 1, 
+        textAlign: isRTL ? 'left' : 'right' 
     }),
     
     inputContainer: (theme, isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', backgroundColor: theme.inputBackground, borderRadius: 15, paddingHorizontal: 20, marginVertical: 8, borderWidth: 1, borderColor: theme.borderColor, height: 55 }),
