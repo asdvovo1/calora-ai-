@@ -95,8 +95,7 @@
         {
           "isSwift": true
         }
-      ],
-      "./plugins/withForceRtl.js"
+      ]
     ],
     "extra": {
       "supportsRTL": true,

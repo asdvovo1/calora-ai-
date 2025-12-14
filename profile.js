@@ -13,15 +13,15 @@ const translations = {
 const lightTheme = { background: '#F5FBF5', surface: '#FFFFFF', primaryText: '#1C1C1E', secondaryText: '#8A8A8E', separator: '#E5E5EA', logout: '#FF3B30', statusBar: 'dark-content', borderColor: '#FFFFFF' };
 const darkTheme = { background: '#121212', surface: '#1E1E1E', primaryText: '#FFFFFF', secondaryText: '#A5A5A5', separator: '#38383A', logout: '#EF5350', statusBar: 'light-content', borderColor: '#1E1E1E' };
 
-// ✅ التعديل: حذفنا row-reverse
-const SettingsItem = ({ icon, name, onPress, color, theme, isRTL }) => (
-    <TouchableOpacity style={styles.settingsItem(theme)} onPress={onPress}>
-      <View style={styles.settingsItemContent}>
-        <View style={styles.settingsItemIcon}>{icon}</View>
+// ✅ تم التعديل: تمرير اللغة لتحديد الاتجاه
+const SettingsItem = ({ icon, name, onPress, color, theme, appLanguage }) => (
+    <TouchableOpacity style={styles.settingsItem(theme, appLanguage)} onPress={onPress}>
+      <View style={styles.settingsItemContent(theme, appLanguage)}>
+        <View style={styles.settingsItemIcon(appLanguage)}>{icon}</View>
         <Text style={[styles.settingsItemText(theme), { color: color || theme.primaryText }]}>{name}</Text>
       </View>
-      {/* عكس السهم فقط */}
-      <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
+      {/* أيقونة السهم: في الإنجليزي (بسبب القلب) هنحتاج نعكس اتجاه السهم لو عايزين شكله مظبوط */}
+      <Icon name={appLanguage === 'ar' ? "chevron-left" : "chevron-right"} size={22} color="#C7C7CC" />
     </TouchableOpacity>
 );
 
@@ -32,7 +32,6 @@ const ProfileScreen = ({ appLanguage }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   const [currentLanguage, setCurrentLanguage] = useState(appLanguage || 'en');
-  const isRTL = currentLanguage === 'ar';
 
   const theme = isDarkMode ? darkTheme : lightTheme;
   const t = (key) => translations[currentLanguage]?.[key] || translations['en'][key];
@@ -136,16 +135,45 @@ const ProfileScreen = ({ appLanguage }) => {
             {getDisplayName()}
           </Text>
         </View>
+        
         <View style={styles.menuContainer}>
+          {/* Section 1 */}
           <View style={styles.menuSection(theme)}>
-            <SettingsItem isRTL={isRTL} icon={<Icon name="user" size={22} color={theme.secondaryText} />} name={t('editProfile')} onPress={() => navigation.navigate('EditProfile')} theme={theme} />
+            <SettingsItem 
+                appLanguage={currentLanguage} 
+                icon={<Icon name="user" size={22} color={theme.secondaryText} />} 
+                name={t('editProfile')} 
+                onPress={() => navigation.navigate('EditProfile')} 
+                theme={theme} 
+            />
             <View style={styles.separator(theme)} />
-            <SettingsItem isRTL={isRTL} icon={<Ionicons name="settings-outline" size={22} color={theme.secondaryText} />} name={t('settings')} onPress={() => navigation.navigate('Settings')} theme={theme} />
+            <SettingsItem 
+                appLanguage={currentLanguage} 
+                icon={<Ionicons name="settings-outline" size={22} color={theme.secondaryText} />} 
+                name={t('settings')} 
+                onPress={() => navigation.navigate('Settings')} 
+                theme={theme} 
+            />
           </View>
+
+          {/* Section 2 */}
           <View style={styles.menuSection(theme)}>
-            <SettingsItem isRTL={isRTL} icon={<Icon name="info" size={22} color={theme.secondaryText} />} name={t('about')} onPress={() => navigation.navigate('About')} theme={theme} />
+            <SettingsItem 
+                appLanguage={currentLanguage} 
+                icon={<Icon name="info" size={22} color={theme.secondaryText} />} 
+                name={t('about')} 
+                onPress={() => navigation.navigate('About')} 
+                theme={theme} 
+            />
             <View style={styles.separator(theme)} />
-            <SettingsItem isRTL={isRTL} icon={<Ionicons name="log-out-outline" size={24} color={theme.logout} />} name={t('logout')} onPress={handleLogout} color={theme.logout} theme={theme} />
+            <SettingsItem 
+                appLanguage={currentLanguage} 
+                icon={<Ionicons name="log-out-outline" size={24} color={theme.logout} />} 
+                name={t('logout')} 
+                onPress={handleLogout} 
+                color={theme.logout} 
+                theme={theme} 
+            />
           </View>
         </View>
       </ScrollView>
@@ -153,7 +181,6 @@ const ProfileScreen = ({ appLanguage }) => {
   );
 };
 
-// ✅ التعديلات هنا: تبسيط الستايلات واستخدام marginEnd
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }),
   header: { height: 200, overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, },
@@ -164,28 +191,32 @@ const styles = {
   menuContainer: { paddingHorizontal: 20, marginTop: 40 },
   menuSection: (theme) => ({ backgroundColor: theme.surface, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }),
   
-  settingsItem: (theme) => ({ 
-    flexDirection: 'row', // ✅ دائماً row، النظام يقلبها
+  settingsItem: (theme, language) => ({ 
+    flexDirection: language === 'en' ? 'row-reverse' : 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
     paddingHorizontal: 15, 
     paddingVertical: 15 
   }),
   
-  settingsItemContent: { 
+  settingsItemContent: (theme, language) => ({ 
     alignItems: 'center', 
     flex: 1, 
-    flexDirection: 'row' // ✅ دائماً row
-  },
+    flexDirection: language === 'en' ? 'row-reverse' : 'row',
+    // ✅ إضافة دي عشان نضمن إن المحتوى (الأيقونة والنص) يفضلوا لازقين في بعض وميتفردوش
+    justifyContent: 'flex-start' 
+  }),
   
-  settingsItemIcon: { 
-    marginEnd: 15 // ✅ يعمل تلقائياً في الجهتين
-  }, 
+  // ✅ التعديل هنا: قللنا المسافة من 15 لـ 8
+  settingsItemIcon: (language) => ({ 
+    marginEnd: language === 'en' ? 0 : 8,   // لو عربي، المسافة يمين
+    marginStart: language === 'en' ? 8 : 0  // لو إنجليزي، المسافة شمال
+  }), 
   
   settingsItemText: (theme) => ({ 
     fontSize: 17, 
     color: theme.primaryText, 
-    textAlign: 'left' // ✅ في العربي يصبح يمين تلقائياً
+    textAlign: 'left'
   }),
   
   separator: (theme) => ({ height: StyleSheet.hairlineWidth, backgroundColor: theme.separator, marginHorizontal: 15 }),

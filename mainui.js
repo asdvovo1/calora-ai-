@@ -35,6 +35,20 @@ import AboutScreen from './about';
 
 const STEPS_NOTIFICATION_TASK = 'steps-notification-task';
 
+// --- Helper for Layout Direction ---
+// دي الدالة السحرية اللي هتظبط الاتجاه في كل حتة في الصفحة
+const getFlexDirection = (language) => {
+    const isAppRTL = language === 'ar';
+    const isSystemRTL = I18nManager.isRTL;
+    // لو لغة التطبيق زي لغة الجهاز، خليها طبيعي (row)
+    // لو مختلفين (واحد عربي وواحد إنجليزي)، اعكس (row-reverse)
+    return isAppRTL === isSystemRTL ? 'row' : 'row-reverse';
+};
+
+const getTextAlign = (language) => {
+    return language === 'ar' ? 'right' : 'left';
+};
+
 TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
     try {
         const settingsRaw = await AsyncStorage.getItem('reminderSettings');
@@ -181,21 +195,24 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
 
     const isNextDisabled = startDate.getTime() >= todayWeekStart.getTime();
 
+    // ✅ تحديث الاتجاه
+    const flexDirection = getFlexDirection(language);
+
     return (
         <View style={styles.dateNavContainer(theme)}>
-            <View style={styles.dateNavHeader}>
+            <View style={[styles.dateNavHeader, { flexDirection: flexDirection }]}>
                 <TouchableOpacity onPress={handlePrevWeek} style={styles.arrowButton}>
-                    <Ionicons name={I18nManager.isRTL ? "chevron-forward-outline" : "chevron-back-outline"} size={24} color={theme.primary} />
+                    <Ionicons name={language === 'ar' ? "chevron-forward-outline" : "chevron-back-outline"} size={24} color={theme.primary} />
                 </TouchableOpacity>
                 <Text style={styles.dateNavMonthText(theme)}>{monthYearString}</Text>
                 <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton} disabled={isNextDisabled}>
-                    <Ionicons name={I18nManager.isRTL ? "chevron-back-outline" : "chevron-forward-outline"} size={24} color={isNextDisabled ? theme.disabled : theme.primary} />
+                    <Ionicons name={language === 'ar' ? "chevron-back-outline" : "chevron-forward-outline"} size={24} color={isNextDisabled ? theme.disabled : theme.primary} />
                 </TouchableOpacity>
             </View>
-            <View style={styles.weekContainer}>
+            <View style={[styles.weekContainer, { flexDirection: flexDirection }]}>
                 {weekDays.map((day, index) => <Text key={index} style={styles.weekDayText(theme)}>{day}</Text>)}
             </View>
-            <View style={styles.datesContainer}>
+            <View style={[styles.datesContainer, { flexDirection: flexDirection }]}>
                 {displayDates.map((date, index) => {
                     const normalizedDate = new Date(date);
                     normalizedDate.setHours(0, 0, 0, 0);
@@ -216,7 +233,7 @@ const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, l
     );
 };
 
-const SummaryCard = ({ data, dailyGoal, theme, t }) => { 
+const SummaryCard = ({ data, dailyGoal, theme, t, language }) => { 
     const SIZE = Dimensions.get('window').width * 0.5; 
     const STROKE_WIDTH = 18; 
     const INDICATOR_SIZE = 24; 
@@ -274,18 +291,21 @@ const SummaryCard = ({ data, dailyGoal, theme, t }) => {
     ); 
 };
 
-const NutrientRow = ({ label, consumed, goal, color, unit = 'جم', isLimit = false, theme }) => { 
+// ✅ تم تعديل الصفوف لتقلب الاتجاه حسب اللغة
+const NutrientRow = ({ label, consumed, goal, color, unit = 'جم', isLimit = false, theme, language }) => { 
     const isOverLimit = isLimit && consumed > goal; 
     const progressColor = isOverLimit ? theme.overLimit : color;
     const valueText = `${Math.round(consumed)} / ${goal} ${unit}`;
+    const flexDirection = getFlexDirection(language);
 
     return (
         <View style={styles.nutrientRowContainer}>
-            <View style={styles.nutrientRowHeader}>
+            <View style={[styles.nutrientRowHeader, { flexDirection: flexDirection }]}>
                 <Text style={styles.nutrientRowLabel(theme)}>{label}</Text>
                 <Text style={styles.nutrientRowValue(theme)}>{valueText}</Text>
             </View>
-            <View style={{ transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }] }}>
+            {/* في التقدم، لو اللغة عربي اعكس البار */}
+            <View style={{ transform: [{ scaleX: language === 'ar' ? -1 : 1 }] }}>
                 <Progress.Bar 
                     progress={goal > 0 ? consumed / goal : 0} 
                     width={null} 
@@ -300,35 +320,157 @@ const NutrientRow = ({ label, consumed, goal, color, unit = 'جم', isLimit = fa
     ); 
 };
 
-const NutrientSummaryCard = ({ data, theme, t }) => { const nutrients = [{ label: t('protein'), consumed: data.protein.consumed, goal: data.protein.goal, color: theme.protein, unit: t('g_unit') }, { label: t('carbs'), consumed: data.carbs.consumed, goal: data.carbs.goal, color: theme.carbs, unit: t('g_unit') }, { label: t('fat'), consumed: data.fat.consumed, goal: data.fat.goal, color: theme.fat, unit: t('g_unit') }, { label: t('fiber'), consumed: data.fiber.consumed, goal: data.fiber.goal, color: theme.fiber, unit: t('g_unit') }, { label: t('sugar'), consumed: data.sugar.consumed, goal: data.sugar.goal, color: theme.sugar, unit: t('g_unit'), isLimit: true }, { label: t('sodium'), consumed: data.sodium.consumed, goal: data.sodium.goal, color: theme.sodium, unit: t('mg_unit'), isLimit: true },]; return (<View style={styles.card(theme)}>{nutrients.map((nutrient, index) => (<NutrientRow key={index} {...nutrient} theme={theme} />))}</View>); };
+const NutrientSummaryCard = ({ data, theme, t, language }) => { 
+    const nutrients = [
+        { label: t('protein'), consumed: data.protein.consumed, goal: data.protein.goal, color: theme.protein, unit: t('g_unit') }, 
+        { label: t('carbs'), consumed: data.carbs.consumed, goal: data.carbs.goal, color: theme.carbs, unit: t('g_unit') }, 
+        { label: t('fat'), consumed: data.fat.consumed, goal: data.fat.goal, color: theme.fat, unit: t('g_unit') }, 
+        { label: t('fiber'), consumed: data.fiber.consumed, goal: data.fiber.goal, color: theme.fiber, unit: t('g_unit') }, 
+        { label: t('sugar'), consumed: data.sugar.consumed, goal: data.sugar.goal, color: theme.sugar, unit: t('g_unit'), isLimit: true }, 
+        { label: t('sodium'), consumed: data.sodium.consumed, goal: data.sodium.goal, color: theme.sodium, unit: t('mg_unit'), isLimit: true },
+    ]; 
+    return (
+        <View style={styles.card(theme)}>
+            {nutrients.map((nutrient, index) => (<NutrientRow key={index} {...nutrient} theme={theme} language={language} />))}
+        </View>
+    ); 
+};
 
-const FoodLogItem = ({ item, theme, t, showMacros = true }) => { let imageSource = null; if (item.capturedImageUri) { imageSource = { uri: item.capturedImageUri }; } else if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:'))) { imageSource = { uri: item.image }; } else if (item.image) { imageSource = { uri: `https://spoonacular.com/cdn/ingredients_100x100/${item.image}` }; } return (<View style={styles.foodLogItemContainer}>{imageSource ? (<Image source={imageSource} style={styles.foodLogItemImage} />) : (<View style={styles.foodLogItemImagePlaceholder(theme)}><Ionicons name="restaurant-outline" size={24} color={theme.primary} /></View>)}<View style={styles.foodLogItemDetails}><View style={styles.foodLogItemHeader}><Text style={styles.foodLogItemName(theme)} numberOfLines={1}>{item.name}</Text><Text style={styles.foodLogItemCalories(theme)}>{Math.round(item.calories)} {t('kcal_unit')}</Text></View>{showMacros && (<View style={styles.foodLogItemMacros}><Text style={styles.macroText(theme)}><Text style={{ color: theme.protein }}>{t('p_macro')}</Text>{Math.round(item.p || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.carbs }}>{t('c_macro')}</Text>{Math.round(item.c || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.fat }}>{t('f_macro')}</Text>{Math.round(item.f || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.fiber }}>{t('fib_macro')}</Text>{Math.round(item.fib || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.sugar }}>{t('sug_macro')}</Text>{Math.round(item.sug || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.sodium }}>{t('sod_macro')}</Text>{Math.round(item.sod || 0)}mg</Text></View>)}</View></View>); };
-const DailyFoodLog = ({ items, onPress, theme, t }) => { const isEmpty = !items || items.length === 0; const MAX_PREVIEW_IMAGES = 4; const getImageSource = (item) => { if (item.capturedImageUri) return { uri: item.capturedImageUri }; if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:'))) return { uri: item.image }; if (item.image) return { uri: `https://spoonacular.com/cdn/ingredients_100x100/${item.image}` }; return null; }; return (<TouchableOpacity onPress={onPress} activeOpacity={0.8}><View style={[styles.card(theme), styles.dailyLogCard]}><View style={styles.dailyLogContentContainer}><Text style={styles.sectionTitle(theme)}>{t('dailyLogTitle')}</Text><View style={styles.dailyLogLeftContainer}>
-    {!isEmpty ? (
-        <View style={styles.foodPreviewContainer}>
-            {items.length > MAX_PREVIEW_IMAGES && (
-                <View style={[styles.previewCounterCircle(theme), { zIndex: 0 }]}>
-                    <Text style={styles.previewCounterText(theme)}>+{items.length - MAX_PREVIEW_IMAGES}</Text>
+const FoodLogItem = ({ item, theme, t, showMacros = true, language }) => { 
+    let imageSource = null; 
+    if (item.capturedImageUri) { imageSource = { uri: item.capturedImageUri }; } else if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:'))) { imageSource = { uri: item.image }; } else if (item.image) { imageSource = { uri: `https://spoonacular.com/cdn/ingredients_100x100/${item.image}` }; } 
+    
+    const flexDirection = getFlexDirection(language);
+    const textAlign = getTextAlign(language);
+
+    return (
+        <View style={[styles.foodLogItemContainer, { flexDirection: flexDirection }]}>
+            {imageSource ? (<Image source={imageSource} style={[styles.foodLogItemImage, language === 'ar' ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15, marginLeft: 0 }]} />) : (<View style={[styles.foodLogItemImagePlaceholder(theme), language === 'ar' ? { marginLeft: 15, marginRight: 0 } : { marginRight: 15, marginLeft: 0 }]}><Ionicons name="restaurant-outline" size={24} color={theme.primary} /></View>)}
+            <View style={styles.foodLogItemDetails}>
+                <View style={[styles.foodLogItemHeader, { flexDirection: flexDirection }]}>
+                    <Text style={[styles.foodLogItemName(theme), { textAlign: textAlign }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.foodLogItemCalories(theme)}>{Math.round(item.calories)} {t('kcal_unit')}</Text>
+                </View>
+                {showMacros && (<View style={[styles.foodLogItemMacros, { flexDirection: flexDirection }]}><Text style={styles.macroText(theme)}><Text style={{ color: theme.protein }}>{t('p_macro')}</Text>{Math.round(item.p || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.carbs }}>{t('c_macro')}</Text>{Math.round(item.c || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.fat }}>{t('f_macro')}</Text>{Math.round(item.f || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.fiber }}>{t('fib_macro')}</Text>{Math.round(item.fib || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.sugar }}>{t('sug_macro')}</Text>{Math.round(item.sug || 0)}g</Text><Text style={styles.macroText(theme)}><Text style={{ color: theme.sodium }}>{t('sod_macro')}</Text>{Math.round(item.sod || 0)}mg</Text></View>)}
+            </View>
+        </View>
+    ); 
+};
+
+const DailyFoodLog = ({ items, onPress, theme, t, language }) => { 
+    const isEmpty = !items || items.length === 0; 
+    const MAX_PREVIEW_IMAGES = 4; 
+    const getImageSource = (item) => { if (item.capturedImageUri) return { uri: item.capturedImageUri }; if (item.image && (item.image.startsWith('http') || item.image.startsWith('data:'))) return { uri: item.image }; if (item.image) return { uri: `https://spoonacular.com/cdn/ingredients_100x100/${item.image}` }; return null; }; 
+    const flexDirection = getFlexDirection(language);
+    
+    return (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+            <View style={[styles.card(theme), styles.dailyLogCard]}>
+                <View style={[styles.dailyLogContentContainer, { flexDirection: flexDirection }]}>
+                    <Text style={[styles.sectionTitle(theme), { textAlign: getTextAlign(language) }]}>{t('dailyLogTitle')}</Text>
+                    <View style={[styles.dailyLogLeftContainer, { flexDirection: flexDirection }]}>
+                        {!isEmpty ? (
+                            <View style={[styles.foodPreviewContainer, { flexDirection: flexDirection }]}>
+                                {items.length > MAX_PREVIEW_IMAGES && (
+                                    <View style={[styles.previewCounterCircle(theme), { zIndex: 0 }]}>
+                                        <Text style={styles.previewCounterText(theme)}>+{items.length - MAX_PREVIEW_IMAGES}</Text>
+                                    </View>
+                                )}
+                                {items.slice(0, MAX_PREVIEW_IMAGES).map((item, index) => { 
+                                    const imageSource = getImageSource(item); 
+                                    const zIndex = MAX_PREVIEW_IMAGES - index; 
+                                    const marginStyle = language === 'ar' ? { marginRight: -18, zIndex } : { marginLeft: -18, zIndex }; 
+                                    return imageSource ? 
+                                        (<Image key={`${item.id}-${index}`} source={imageSource} style={[styles.previewImage(theme), marginStyle]} />) : 
+                                        (<View key={`${item.id}-${index}`} style={[styles.previewImage(theme), styles.previewImagePlaceholder(theme), marginStyle]}><Ionicons name="restaurant-outline" size={16} color={theme.primary} /></View>); 
+                                })}
+                            </View>
+                        ) : (<Ionicons name={language === 'ar' ? "chevron-back-outline" : "chevron-forward-outline"} size={24} color={theme.textSecondary} />)}
+                    </View>
+                </View>
+            </View>
+        </TouchableOpacity>
+    ); 
+};
+
+// ✅ تعديل اتجاه قسم الوجبات
+const MealLoggingSection = ({ title, iconName, items, onAddPress, mealKey, isEditable, theme, t, language }) => { 
+    const totalCalories = items.reduce((sum, item) => sum + (item.calories || 0), 0); 
+    const totalMacros = items.reduce((totals, item) => { totals.p += item.p || 0; totals.c += item.c || 0; totals.f += item.f || 0; totals.fib += item.fib || 0; totals.sug += item.sug || 0; totals.sod += item.sod || 0; return totals; }, { p: 0, c: 0, f: 0, fib: 0, sug: 0, sod: 0 }); 
+    const flexDirection = getFlexDirection(language);
+
+    return (
+        <View style={styles.card(theme)}>
+            <View style={[styles.mealSectionHeader, { flexDirection: flexDirection }]}>
+                <View style={[styles.mealSectionHeaderLeft, { flexDirection: flexDirection }]}>
+                    <Ionicons name={iconName} size={24} color={theme.primary} style={language === 'ar' ? { marginLeft: 10 } : { marginRight: 10 }} />
+                    <Text style={styles.mealSectionTitle(theme)}>{title}</Text>
+                </View>
+                <Text style={styles.mealSectionTotalCalories(theme)}>{Math.round(totalCalories)} {t('kcal_unit')}</Text>
+            </View>
+            {items && items.length > 0 && items.map((item, index) => (<FoodLogItem key={`${item.id}-${index}`} item={item} showMacros={false} theme={theme} t={t} language={language} />))}
+            {items && items.length > 0 && (
+                <View style={[styles.mealMacrosContainer(theme), { flexDirection: flexDirection }]}>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('fat')}: {Math.round(totalMacros.f)} {t('g_unit')}</Text></View>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('carbs')}: {Math.round(totalMacros.c)} {t('g_unit')}</Text></View>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('protein')}: {Math.round(totalMacros.p)} {t('g_unit')}</Text></View>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('sugar')}: {Math.round(totalMacros.sug)} {t('g_unit')}</Text></View>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('fiber')}: {Math.round(totalMacros.fib)} {t('g_unit')}</Text></View>
+                    <View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('sodium')}: {Math.round(totalMacros.sod)} {t('mg_unit')}</Text></View>
                 </View>
             )}
-            {items.slice(0, MAX_PREVIEW_IMAGES).map((item, index) => { 
-                const imageSource = getImageSource(item); 
-                const zIndex = MAX_PREVIEW_IMAGES - index; 
-                const marginStyle = { marginStart: -18, zIndex }; 
-                return imageSource ? 
-                    (<Image key={`${item.id}-${index}`} source={imageSource} style={[styles.previewImage(theme), marginStyle]} />) : 
-                    (<View key={`${item.id}-${index}`} style={[styles.previewImage(theme), styles.previewImagePlaceholder(theme), marginStyle]}><Ionicons name="restaurant-outline" size={16} color={theme.primary} /></View>); 
-            })}
+            <TouchableOpacity style={[styles.smartAddButton(theme), !isEditable && styles.disabledButton(theme)]} onPress={() => onAddPress(mealKey)} disabled={!isEditable} ><Text style={styles.smartAddButtonText(theme)}>{t('add_to_meal', {meal: title})}</Text></TouchableOpacity>
         </View>
-    ) : (<Ionicons name={I18nManager.isRTL ? "chevron-back-outline" : "chevron-forward-outline"} size={24} color={theme.textSecondary} />)}
-</View></View></View></TouchableOpacity>); };
-const MealLoggingSection = ({ title, iconName, items, onAddPress, mealKey, isEditable, theme, t }) => { const totalCalories = items.reduce((sum, item) => sum + (item.calories || 0), 0); const totalMacros = items.reduce((totals, item) => { totals.p += item.p || 0; totals.c += item.c || 0; totals.f += item.f || 0; totals.fib += item.fib || 0; totals.sug += item.sug || 0; totals.sod += item.sod || 0; return totals; }, { p: 0, c: 0, f: 0, fib: 0, sug: 0, sod: 0 }); return (<View style={styles.card(theme)}><View style={styles.mealSectionHeader}><View style={styles.mealSectionHeaderLeft}><Ionicons name={iconName} size={24} color={theme.primary} style={styles.mealIcon} /><Text style={styles.mealSectionTitle(theme)}>{title}</Text></View><Text style={styles.mealSectionTotalCalories(theme)}>{Math.round(totalCalories)} {t('kcal_unit')}</Text></View>{items && items.length > 0 && items.map((item, index) => (<FoodLogItem key={`${item.id}-${index}`} item={item} showMacros={false} theme={theme} t={t} />))}{items && items.length > 0 && (<View style={styles.mealMacrosContainer(theme)}><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('fat')}: {Math.round(totalMacros.f)} {t('g_unit')}</Text></View><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('carbs')}: {Math.round(totalMacros.c)} {t('g_unit')}</Text></View><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('protein')}: {Math.round(totalMacros.p)} {t('g_unit')}</Text></View><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('sugar')}: {Math.round(totalMacros.sug)} {t('g_unit')}</Text></View><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('fiber')}: {Math.round(totalMacros.fib)} {t('g_unit')}</Text></View><View style={styles.macroSummaryItem}><Text style={styles.macroSummaryText(theme)}>{t('sodium')}: {Math.round(totalMacros.sod)} {t('mg_unit')}</Text></View></View>)}<TouchableOpacity style={[styles.smartAddButton(theme), !isEditable && styles.disabledButton(theme)]} onPress={() => onAddPress(mealKey)} disabled={!isEditable} ><Text style={styles.smartAddButtonText(theme)}>{t('add_to_meal', {meal: title})}</Text></TouchableOpacity></View>); };
-const AddFoodModal = ({ visible, onClose, onFoodSelect, mealKey, theme, t }) => { const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [loading, setLoading] = useState(false); const [fetchingDetailsId, setFetchingDetailsId] = useState(null); const mealTranslations = { breakfast: t('breakfast'), lunch: t('lunch'), dinner: t('dinner'), snacks: t('snacks') }; const mealTitle = mealTranslations[mealKey] || '...'; const handleClose = () => { setQuery(''); setResults([]); setLoading(false); setFetchingDetailsId(null); onClose(); }; const searchSpoonacular = async (searchQuery) => { try { const response = await fetch(`https://api.spoonacular.com/food/ingredients/search?query=${searchQuery}&number=15&apiKey=${SPOONACULAR_API_KEY}`); const data = await response.json(); return data.results ? data.results.map(item => ({ ...item, source: 'spoonacular' })) : []; } catch (error) { console.error("Spoonacular Search API Error:", error); return []; } }; const handleSearch = async () => { if (!query.trim()) { Alert.alert(t('error'), t('search_error_msg')); return; } setLoading(true); setResults([]); try { const [egyptianResults, spoonacularResults] = await Promise.all([searchEgyptianFoodsWithImages(query), searchSpoonacular(query)]); setResults([...egyptianResults, ...spoonacularResults]); } catch (error) { Alert.alert(t('error'), t('fetch_error_msg')); } finally { setLoading(false); } }; const handleSelectFood = async (selectedItem) => { if (selectedItem.source === 'local') { onFoodSelect(selectedItem); handleClose(); return; } setFetchingDetailsId(selectedItem.id); try { const response = await fetch(`https://api.spoonacular.com/food/ingredients/${selectedItem.id}/information?amount=100&unit=g&apiKey=${SPOONACULAR_API_KEY}`); const data = await response.json(); if (data.nutrition && data.nutrition.nutrients) { const nutrition = data.nutrition.nutrients; const finalFoodItem = { id: data.id, name: data.name, quantity: '100g', calories: Math.round(nutrition.find(n => n.name === 'Calories')?.amount || 0), p: Math.round(nutrition.find(n => n.name === 'Protein')?.amount || 0), c: Math.round(nutrition.find(n => n.name === 'Carbohydrates')?.amount || 0), f: Math.round(nutrition.find(n => n.name === 'Fat')?.amount || 0), fib: Math.round(nutrition.find(n => n.name === 'Fiber')?.amount || 0), sug: Math.round(nutrition.find(n => n.name === 'Sugar')?.amount || 0), sod: Math.round(nutrition.find(n => n.name === 'Sodium')?.amount || 0), image: selectedItem.image, }; onFoodSelect(finalFoodItem); handleClose(); } else { Alert.alert(t('error'), t('fetch_error_msg')); } } catch (error) { console.error("Spoonacular Details API Error:", error); Alert.alert(t('error'), t('fetch_error_msg')); } finally { setFetchingDetailsId(null); } }; return (<Modal visible={visible} onRequestClose={handleClose} animationType="slide" transparent={true}><View style={styles.modalOverlay}><View style={styles.modalView(theme)}><View style={styles.modalHeader(theme)}><Text style={styles.modalTitle(theme)}>{t('add_to')} {mealTitle}</Text><TouchableOpacity onPress={handleClose}><Ionicons name="close-circle" size={30} color={theme.primary} /></TouchableOpacity></View><View style={styles.searchContainer}><TextInput style={styles.searchInput(theme)} placeholder={t('search_placeholder')} value={query} onChangeText={setQuery} placeholderTextColor={theme.textSecondary} returnKeyType="search" onSubmitEditing={handleSearch} /><TouchableOpacity style={styles.searchButton(theme)} onPress={handleSearch}><Ionicons name="search" size={24} color={theme.white} /></TouchableOpacity></View>{loading ? (<ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />) : (<FlatList data={results} keyExtractor={(item, index) => `${item.id}-${index}`} renderItem={({ item }) => (<TouchableOpacity style={styles.resultItem} onPress={() => handleSelectFood(item)} disabled={fetchingDetailsId !== null}><View style={{ flex: 1, alignItems: 'flex-start' }}><Text style={styles.foodName(theme)}>{item.name}</Text>{item.source === 'local' && <Text style={{color: theme.primary, fontSize: 12}}>{t('local_food')}</Text>}</View>{fetchingDetailsId === item.id ? (<ActivityIndicator size="small" color={theme.primary} style={{ marginStart: 15 }} />) : (<Ionicons name="add-circle-outline" size={28} color={theme.primary} style={{ marginStart: 15 }} />)}</TouchableOpacity>)} ListEmptyComponent={!loading && query.length > 0 ? <Text style={styles.emptyText(theme)}>{t('no_results')}</Text> : null} />)}</View></View></Modal>);};
-const SmallWeightCard = ({ weight, onPress, theme, t }) => (<TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="barbell-outline" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('weight')}</Text></View><Text style={styles.smallCardValue(theme)}>{weight > 0 ? `${weight} ${t('kg_unit')}` : t('not_logged')}</Text></TouchableOpacity>);
-const SmallWaterCard = ({ water, waterGoal, onPress, theme, t }) => { const DISPLAY_DROPS = 15; const filledDrops = Math.min(water || 0, DISPLAY_DROPS); const totalDropsToDisplay = Math.min(waterGoal || DISPLAY_DROPS, DISPLAY_DROPS); const drops = Array.from({ length: totalDropsToDisplay }, (_, i) => i); return (<TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="water-outline" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('water')}</Text></View><View style={styles.waterVisualizerContainer}>{drops.map(index => (<Ionicons key={index} name={index < filledDrops ? 'water' : 'water-outline'} size={22} color={index < filledDrops ? '#007BFF' : theme.disabled} style={styles.waterDropIcon} />))}</View></TouchableOpacity>); };
-const SmallWorkoutCard = ({ totalCaloriesBurned = 0, onPress, theme, t }) => { return ( <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="run-fast" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('workouts')}</Text></View><View style={styles.smallCardContent}><Text style={styles.smallCardValue(theme)}>{totalCaloriesBurned > 0 ? `🔥 ${Math.round(totalCaloriesBurned)}` : t('not_logged')}</Text>{totalCaloriesBurned > 0 ? <Text style={styles.smallCardSubValue(theme)}>{t('burned_cal')}</Text> : null }</View></TouchableOpacity> ); };
+    ); 
+};
 
-const SmallStepsCard = ({ navigation, theme, t }) => { 
+const AddFoodModal = ({ visible, onClose, onFoodSelect, mealKey, theme, t }) => { const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [loading, setLoading] = useState(false); const [fetchingDetailsId, setFetchingDetailsId] = useState(null); const mealTranslations = { breakfast: t('breakfast'), lunch: t('lunch'), dinner: t('dinner'), snacks: t('snacks') }; const mealTitle = mealTranslations[mealKey] || '...'; const handleClose = () => { setQuery(''); setResults([]); setLoading(false); setFetchingDetailsId(null); onClose(); }; const searchSpoonacular = async (searchQuery) => { try { const response = await fetch(`https://api.spoonacular.com/food/ingredients/search?query=${searchQuery}&number=15&apiKey=${SPOONACULAR_API_KEY}`); const data = await response.json(); return data.results ? data.results.map(item => ({ ...item, source: 'spoonacular' })) : []; } catch (error) { console.error("Spoonacular Search API Error:", error); return []; } }; const handleSearch = async () => { if (!query.trim()) { Alert.alert(t('error'), t('search_error_msg')); return; } setLoading(true); setResults([]); try { const [egyptianResults, spoonacularResults] = await Promise.all([searchEgyptianFoodsWithImages(query), searchSpoonacular(query)]); setResults([...egyptianResults, ...spoonacularResults]); } catch (error) { Alert.alert(t('error'), t('fetch_error_msg')); } finally { setLoading(false); } }; const handleSelectFood = async (selectedItem) => { if (selectedItem.source === 'local') { onFoodSelect(selectedItem); handleClose(); return; } setFetchingDetailsId(selectedItem.id); try { const response = await fetch(`https://api.spoonacular.com/food/ingredients/${selectedItem.id}/information?amount=100&unit=g&apiKey=${SPOONACULAR_API_KEY}`); const data = await response.json(); if (data.nutrition && data.nutrition.nutrients) { const nutrition = data.nutrition.nutrients; const finalFoodItem = { id: data.id, name: data.name, quantity: '100g', calories: Math.round(nutrition.find(n => n.name === 'Calories')?.amount || 0), p: Math.round(nutrition.find(n => n.name === 'Protein')?.amount || 0), c: Math.round(nutrition.find(n => n.name === 'Carbohydrates')?.amount || 0), f: Math.round(nutrition.find(n => n.name === 'Fat')?.amount || 0), fib: Math.round(nutrition.find(n => n.name === 'Fiber')?.amount || 0), sug: Math.round(nutrition.find(n => n.name === 'Sugar')?.amount || 0), sod: Math.round(nutrition.find(n => n.name === 'Sodium')?.amount || 0), image: selectedItem.image, }; onFoodSelect(finalFoodItem); handleClose(); } else { Alert.alert(t('error'), t('fetch_error_msg')); } } catch (error) { console.error("Spoonacular Details API Error:", error); Alert.alert(t('error'), t('fetch_error_msg')); } finally { setFetchingDetailsId(null); } }; return (<Modal visible={visible} onRequestClose={handleClose} animationType="slide" transparent={true}><View style={styles.modalOverlay}><View style={styles.modalView(theme)}><View style={styles.modalHeader(theme)}><Text style={styles.modalTitle(theme)}>{t('add_to')} {mealTitle}</Text><TouchableOpacity onPress={handleClose}><Ionicons name="close-circle" size={30} color={theme.primary} /></TouchableOpacity></View><View style={styles.searchContainer}><TextInput style={styles.searchInput(theme)} placeholder={t('search_placeholder')} value={query} onChangeText={setQuery} placeholderTextColor={theme.textSecondary} returnKeyType="search" onSubmitEditing={handleSearch} /><TouchableOpacity style={styles.searchButton(theme)} onPress={handleSearch}><Ionicons name="search" size={24} color={theme.white} /></TouchableOpacity></View>{loading ? (<ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />) : (<FlatList data={results} keyExtractor={(item, index) => `${item.id}-${index}`} renderItem={({ item }) => (<TouchableOpacity style={styles.resultItem} onPress={() => handleSelectFood(item)} disabled={fetchingDetailsId !== null}><View style={{ flex: 1, alignItems: 'flex-start' }}><Text style={styles.foodName(theme)}>{item.name}</Text>{item.source === 'local' && <Text style={{color: theme.primary, fontSize: 12}}>{t('local_food')}</Text>}</View>{fetchingDetailsId === item.id ? (<ActivityIndicator size="small" color={theme.primary} style={{ marginStart: 15 }} />) : (<Ionicons name="add-circle-outline" size={28} color={theme.primary} style={{ marginStart: 15 }} />)}</TouchableOpacity>)} ListEmptyComponent={!loading && query.length > 0 ? <Text style={styles.emptyText(theme)}>{t('no_results')}</Text> : null} />)}</View></View></Modal>);};
+
+// ✅ تعديل الكروت الصغيرة
+const SmallWeightCard = ({ weight, onPress, theme, t, language }) => (
+    <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
+        <View style={[styles.smallCardHeader, { flexDirection: getFlexDirection(language) }]}>
+            <View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="barbell-outline" size={20} color={theme.primary} /></View>
+            <Text style={[styles.smallCardTitle(theme), { marginStart: language === 'ar' ? 8 : 8 }]}>{t('weight')}</Text>
+        </View>
+        <Text style={[styles.smallCardValue(theme), { textAlign: getTextAlign(language) }]}>{weight > 0 ? `${weight} ${t('kg_unit')}` : t('not_logged')}</Text>
+    </TouchableOpacity>
+);
+
+const SmallWaterCard = ({ water, waterGoal, onPress, theme, t, language }) => { 
+    const DISPLAY_DROPS = 15; 
+    const filledDrops = Math.min(water || 0, DISPLAY_DROPS); 
+    const totalDropsToDisplay = Math.min(waterGoal || DISPLAY_DROPS, DISPLAY_DROPS); 
+    const drops = Array.from({ length: totalDropsToDisplay }, (_, i) => i); 
+    return (
+        <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
+            <View style={[styles.smallCardHeader, { flexDirection: getFlexDirection(language) }]}>
+                <View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="water-outline" size={20} color={theme.primary} /></View>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('water')}</Text>
+            </View>
+            <View style={[styles.waterVisualizerContainer, { direction: language === 'ar' ? 'rtl' : 'ltr' }]}>
+                {drops.map(index => (<Ionicons key={index} name={index < filledDrops ? 'water' : 'water-outline'} size={22} color={index < filledDrops ? '#007BFF' : theme.disabled} style={styles.waterDropIcon} />))}
+            </View>
+        </TouchableOpacity>
+    ); 
+};
+
+const SmallWorkoutCard = ({ totalCaloriesBurned = 0, onPress, theme, t, language }) => { 
+    return ( 
+        <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}>
+            <View style={[styles.smallCardHeader, { flexDirection: getFlexDirection(language) }]}>
+                <View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="run-fast" size={20} color={theme.primary} /></View>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('workouts')}</Text>
+            </View>
+            <View style={[styles.smallCardContent, { alignItems: language === 'ar' ? 'flex-end' : 'flex-start' }]}>
+                <Text style={styles.smallCardValue(theme)}>{totalCaloriesBurned > 0 ? `🔥 ${Math.round(totalCaloriesBurned)}` : t('not_logged')}</Text>
+                {totalCaloriesBurned > 0 ? <Text style={styles.smallCardSubValue(theme)}>{t('burned_cal')}</Text> : null }
+            </View>
+        </TouchableOpacity> 
+    ); 
+};
+
+const SmallStepsCard = ({ navigation, theme, t, language }) => { 
     const [steps, setSteps] = useState(0);
     const [goal, setGoal] = useState(10000);
     const [isConnected, setIsConnected] = useState(false);
@@ -377,11 +519,11 @@ const SmallStepsCard = ({ navigation, theme, t }) => {
 
     return (
         <TouchableOpacity style={styles.smallCard(theme)} onPress={() => navigation.navigate('Steps')}>
-            <View style={styles.smallCardHeader}>
+            <View style={[styles.smallCardHeader, { flexDirection: getFlexDirection(language) }]}>
                 <View style={[styles.smallCardIconContainer(theme)]}>
                     <MaterialCommunityIcons name="walk" size={20} color={theme.primary} />
                 </View>
-                <Text style={styles.smallCardTitle(theme)}>{t('steps')}</Text>
+                <Text style={[styles.smallCardTitle(theme), { marginStart: 8 }]}>{t('steps')}</Text>
             </View>
             
             <View style={styles.stepsCardContent}>
@@ -413,7 +555,14 @@ const SmallStepsCard = ({ navigation, theme, t }) => {
     ); 
 };
 
-const DashboardGrid = ({ weight, water, waterGoal, totalExerciseCalories, onWeightPress, onWaterPress, onWorkoutPress, navigation, theme, t }) => (<View style={styles.dashboardGridContainer}><SmallWeightCard weight={weight} onPress={onWeightPress} theme={theme} t={t} /><SmallWaterCard water={water} waterGoal={waterGoal} onPress={onWaterPress} theme={theme} t={t} /><SmallWorkoutCard totalCaloriesBurned={totalExerciseCalories} onPress={onWorkoutPress} theme={theme} t={t} /><SmallStepsCard navigation={navigation} theme={theme} t={t} /></View>);
+const DashboardGrid = ({ weight, water, waterGoal, totalExerciseCalories, onWeightPress, onWaterPress, onWorkoutPress, navigation, theme, t, language }) => (
+    <View style={[styles.dashboardGridContainer, { flexDirection: getFlexDirection(language) }]}>
+        <SmallWeightCard weight={weight} onPress={onWeightPress} theme={theme} t={t} language={language} />
+        <SmallWaterCard water={water} waterGoal={waterGoal} onPress={onWaterPress} theme={theme} t={t} language={language} />
+        <SmallWorkoutCard totalCaloriesBurned={totalExerciseCalories} onPress={onWorkoutPress} theme={theme} t={t} language={language} />
+        <SmallStepsCard navigation={navigation} theme={theme} t={t} language={language} />
+    </View>
+);
 
 function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) { 
     const referenceToday = new Date(); 
@@ -429,24 +578,19 @@ function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) 
     const isToday = formatDateKey(selectedDate) === formatDateKey(new Date()); 
     const loadAllData = useCallback(async () => { 
         try { 
-            // ✅ تم الإصلاح: فحص التخزين المحلي أولاً، ثم البيانات الممررة
             const profileJson = await AsyncStorage.getItem('userProfile');
             const savedProfile = profileJson ? JSON.parse(profileJson) : null;
             
             let goalToSet = 2000;
             
             if (savedProfile && savedProfile.dailyGoal) {
-                // الأولوية 1: البيانات المحفوظة محلياً (لأنها الأحدث بعد التعديل)
                 goalToSet = savedProfile.dailyGoal;
             } else if (passedGoal) {
-                // الأولوية 2: البيانات الممررة من تسجيل الدخول (لو مفيش حاجة محفوظة)
                 goalToSet = passedGoal;
-                // نحفظها للمرة الجاية
                 const profileToSave = savedProfile || {};
                 profileToSave.dailyGoal = goalToSet;
                 await AsyncStorage.setItem('userProfile', JSON.stringify(profileToSave));
             } else {
-                 // الأولوية 3: البيانات من Supabase لو مفيش أي حاجة تانية
                  const { data: { user } } = await supabase.auth.getUser();
                  if (user?.user_metadata?.daily_goal) {
                      goalToSet = user.user_metadata.daily_goal;
@@ -491,7 +635,40 @@ function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) 
     const calculatedTotals = allFoodItems.reduce((acc, item) => { return { food: acc.food + (item.calories || 0), protein: acc.protein + (item.p || 0), carbs: acc.carbs + (item.c || 0), fat: acc.fat + (item.f || 0), fiber: acc.fiber + (item.fib || 0), sugar: acc.sugar + (item.sug || 0), sodium: acc.sodium + (item.sod || 0), }; }, { food: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }); 
     const totalExerciseCalories = (dailyData.exercises || []).reduce((sum, ex) => sum + (ex.calories || 0), 0); 
     useEffect(() => { const progressMade = calculatedTotals.food > 0 || totalExerciseCalories > 0; setHasProgress(progressMade); }, [calculatedTotals.food, totalExerciseCalories, setHasProgress]); 
-    return ( <SafeAreaView style={styles.rootContainer(theme)}><StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} /><AddFoodModal visible={isFoodModalVisible} onClose={() => setFoodModalVisible(false)} onFoodSelect={handleFoodSelectedFromModal} mealKey={currentMealKey} theme={theme} t={t} /><ScrollView contentContainerStyle={styles.container}><DateNavigator selectedDate={selectedDate} onDateSelect={setSelectedDate} referenceToday={referenceToday} theme={theme} t={t} language={language} />{!isToday && (<View style={styles.readOnlyBanner(theme)}><Ionicons name="information-circle-outline" size={20} color={theme.white} style={{ marginEnd: 8 }} /><Text style={styles.readOnlyBannerText(theme)}>{t('readOnlyBanner')}</Text></View>)}<SummaryCard data={{ food: calculatedTotals.food, exercise: totalExerciseCalories }} dailyGoal={dailyGoal} theme={theme} t={t} /><NutrientSummaryCard data={{ protein: { consumed: calculatedTotals.protein, goal: macroGoals.protein }, carbs: { consumed: calculatedTotals.carbs, goal: macroGoals.carbs }, fat: { consumed: calculatedTotals.fat, goal: macroGoals.fat }, fiber: { consumed: calculatedTotals.fiber, goal: NUTRIENT_GOALS.fiber }, sugar: { consumed: calculatedTotals.sugar, goal: NUTRIENT_GOALS.sugar }, sodium: { consumed: calculatedTotals.sodium, goal: NUTRIENT_GOALS.sodium }, }} theme={theme} t={t} /><DashboardGrid weight={dailyData.displayWeight || 0} water={dailyData.water || 0} waterGoal={waterGoal} totalExerciseCalories={totalExerciseCalories} onWeightPress={() => navigation.navigate('Weight')} onWaterPress={() => navigation.navigate('Water', { dateKey: formatDateKey(selectedDate) })} onWorkoutPress={() => navigation.navigate('WorkoutLog', { dateKey: formatDateKey(selectedDate) })} navigation={navigation} theme={theme} t={t} /><DailyFoodLog items={allFoodItems} onPress={() => navigation.navigate('FoodLogDetail', { items: allFoodItems, dateString: selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) })} theme={theme} t={t} /><View style={styles.sectionHeaderContainer}><Text style={styles.sectionTitle(theme)}>{t('mealSectionsTitle')}</Text><Text style={styles.sectionDescription(theme)}>{t('mealSectionsDesc')}</Text></View><MealLoggingSection title={t('breakfast')} iconName="sunny-outline" items={dailyData.breakfast || []} onAddPress={handleOpenModal} mealKey="breakfast" isEditable={isToday} theme={theme} t={t} /><MealLoggingSection title={t('lunch')} iconName="partly-sunny-outline" items={dailyData.lunch || []} onAddPress={handleOpenModal} mealKey="lunch" isEditable={isToday} theme={theme} t={t} /><MealLoggingSection title={t('dinner')} iconName="moon-outline" items={dailyData.dinner || []} onAddPress={handleOpenModal} mealKey="dinner" isEditable={isToday} theme={theme} t={t} /><MealLoggingSection title={t('snacks')} iconName="nutrition-outline" items={dailyData.snacks || []} onAddPress={handleOpenModal} mealKey="snacks" isEditable={isToday} theme={theme} t={t} /></ScrollView></SafeAreaView> ); 
+    
+    // ✅ تطبيق الاتجاه الذكي على الكونتينرات الرئيسية
+    const flexDirection = getFlexDirection(language);
+    const textAlign = getTextAlign(language);
+
+    return ( 
+        <SafeAreaView style={styles.rootContainer(theme)}>
+            <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
+            <AddFoodModal visible={isFoodModalVisible} onClose={() => setFoodModalVisible(false)} onFoodSelect={handleFoodSelectedFromModal} mealKey={currentMealKey} theme={theme} t={t} />
+            <ScrollView contentContainerStyle={styles.container}>
+                <DateNavigator selectedDate={selectedDate} onDateSelect={setSelectedDate} referenceToday={referenceToday} theme={theme} t={t} language={language} />
+                {!isToday && (
+                    <View style={[styles.readOnlyBanner(theme), { flexDirection: flexDirection }]}>
+                        <Ionicons name="information-circle-outline" size={20} color={theme.white} style={language === 'ar' ? { marginLeft: 8 } : { marginRight: 8 }} />
+                        <Text style={[styles.readOnlyBannerText(theme), { textAlign: textAlign }]}>{t('readOnlyBanner')}</Text>
+                    </View>
+                )}
+                <SummaryCard data={{ food: calculatedTotals.food, exercise: totalExerciseCalories }} dailyGoal={dailyGoal} theme={theme} t={t} language={language} />
+                <NutrientSummaryCard data={{ protein: { consumed: calculatedTotals.protein, goal: macroGoals.protein }, carbs: { consumed: calculatedTotals.carbs, goal: macroGoals.carbs }, fat: { consumed: calculatedTotals.fat, goal: macroGoals.fat }, fiber: { consumed: calculatedTotals.fiber, goal: NUTRIENT_GOALS.fiber }, sugar: { consumed: calculatedTotals.sugar, goal: NUTRIENT_GOALS.sugar }, sodium: { consumed: calculatedTotals.sodium, goal: NUTRIENT_GOALS.sodium }, }} theme={theme} t={t} language={language} />
+                <DashboardGrid weight={dailyData.displayWeight || 0} water={dailyData.water || 0} waterGoal={waterGoal} totalExerciseCalories={totalExerciseCalories} onWeightPress={() => navigation.navigate('Weight')} onWaterPress={() => navigation.navigate('Water', { dateKey: formatDateKey(selectedDate) })} onWorkoutPress={() => navigation.navigate('WorkoutLog', { dateKey: formatDateKey(selectedDate) })} navigation={navigation} theme={theme} t={t} language={language} />
+                <DailyFoodLog items={allFoodItems} onPress={() => navigation.navigate('FoodLogDetail', { items: allFoodItems, dateString: selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) })} theme={theme} t={t} language={language} />
+                
+                <View style={[styles.sectionHeaderContainer, { alignItems: language === 'ar' ? 'flex-end' : 'flex-start' }]}>
+                    <Text style={[styles.sectionTitle(theme), { textAlign: textAlign }]}>{t('mealSectionsTitle')}</Text>
+                    <Text style={[styles.sectionDescription(theme), { textAlign: textAlign }]}>{t('mealSectionsDesc')}</Text>
+                </View>
+
+                <MealLoggingSection title={t('breakfast')} iconName="sunny-outline" items={dailyData.breakfast || []} onAddPress={handleOpenModal} mealKey="breakfast" isEditable={isToday} theme={theme} t={t} language={language} />
+                <MealLoggingSection title={t('lunch')} iconName="partly-sunny-outline" items={dailyData.lunch || []} onAddPress={handleOpenModal} mealKey="lunch" isEditable={isToday} theme={theme} t={t} language={language} />
+                <MealLoggingSection title={t('dinner')} iconName="moon-outline" items={dailyData.dinner || []} onAddPress={handleOpenModal} mealKey="dinner" isEditable={isToday} theme={theme} t={t} language={language} />
+                <MealLoggingSection title={t('snacks')} iconName="nutrition-outline" items={dailyData.snacks || []} onAddPress={handleOpenModal} mealKey="snacks" isEditable={isToday} theme={theme} t={t} language={language} />
+            </ScrollView>
+        </SafeAreaView> 
+    ); 
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -499,51 +676,87 @@ const INDICATOR_DIAMETER = 70;
 
 const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language }) => {
     const TAB_COUNT = state.routes.length;
-    const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
+    const TAB_WIDTH = Dimensions.get('window').width / TAB_COUNT;
     const [profileImage, setProfileImage] = useState(null);
 
-    const isRTL = language === 'ar';
+    // =========================================================
+    // 1. ترتيب الأيقونات
+    // =========================================================
+    
+    // ✅ الإنجليزي: (Diary) أول واحد عشان ييجي علي الشمال
+    const orderEn = ['ProfileStack', 'Camera', 'ReportsStack', 'DiaryStack'];
 
-    const getTabPosition = (index) => {
-        const positions = isRTL 
-            ? [0, -1, -2, -3]  
-            : [0, -1, -2, -3]; 
-        
-        return positions[index] * TAB_WIDTH;
+    // ✅ العربي: (Profile) أول واحد عشان ييجي علي الشمال، فـ (Diary) يروح أقصي اليمين
+    const orderAr = ['DiaryStack', 'ReportsStack', 'Camera', 'ProfileStack']; 
+
+    // =========================================================
+    // 2. 🛠️ أرقام تظبيط مكان الدائرة (Offsets)
+    // =========================================================
+    // القائمة دي ماشية مع ترتيب الأيقونات اللي هيظهر علي الشاشة من الشمال لليمين
+    // [الأيقونة 1 (شمال), الأيقونة 2, الأيقونة 3, الأيقونة 4 (يمين)]
+    
+    const offsets = {
+        // أرقام تظبيط الإنجليزي (Diary علي الشمال)
+        // [Diary, Reports, Camera, Profile]
+        en: [0, -180, -360, -540], 
+
+        // أرقام تظبيط العربي (Profile علي الشمال)
+        // [Profile, Camera, Reports, Diary]
+        ar: [0, -180, -360, -540]  
     };
+    
+    // ملاحظة: لو عايز تحرك الدائرة يمين اكتب رقم موجب (10)، لو شمال اكتب سالب (-10)
 
-    const translateX = useSharedValue(getTabPosition(state.index));
+    // =========================================================
+
+    // اختيار الترتيب المناسب حسب اللغة
+    const currentOrderNames = language === 'ar' ? orderAr : orderEn;
+    
+    // تكوين قائمة الـ Routes بالترتيب الجديد
+    const orderedRoutes = currentOrderNames.map(name => 
+        state.routes.find(r => r.name === name)
+    ).filter(Boolean);
+
+    // معرفة التابة النشطة حالياً
+    const currentActiveRouteName = state.routes[state.index].name;
+    
+    // معرفة رقم التابة النشطة في الترتيب المختار
+    const activeIndex = currentOrderNames.indexOf(currentActiveRouteName);
+
+    // حساب مكان الدائرة + التعديل اليدوي
+    const manualCorrection = language === 'ar' ? offsets.ar[activeIndex] : offsets.en[activeIndex];
+    const finalTranslateX = (activeIndex * TAB_WIDTH) + (manualCorrection || 0);
+
+    const translateX = useSharedValue(finalTranslateX);
 
     useEffect(() => {
-        const targetPosition = getTabPosition(state.index);
-        translateX.value = withTiming(targetPosition, { duration: 300 }); 
-    }, [state.index, TAB_WIDTH, isRTL]);
+        translateX.value = withTiming(finalTranslateX, { duration: 300 });
+    }, [finalTranslateX]);
 
     useFocusEffect(useCallback(() => {
         const loadProfileImage = async () => {
             try {
                 const jsonValue = await AsyncStorage.getItem('userProfile');
                 setProfileImage(jsonValue ? JSON.parse(jsonValue).profileImage : null);
-            } catch (e) {
-                console.error("Failed to load profile image for tab bar:", e);
-            }
+            } catch (e) { console.error(e); }
         };
         loadProfileImage();
     }, []));
 
-    const indicatorAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
-    const routes = state.routes;
+    const indicatorAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }]
+    }));
 
     return (
-        <View style={[styles.tabBarContainer(theme), { 
-            direction: 'ltr',      
-            flexDirection: 'row'   
-        }]}>
-            <View style={styles.animationWrapper}><LeafAnimation trigger={state.index} /></View>
+        <View style={[styles.tabBarContainer(theme), { flexDirection: 'row', direction: 'ltr' }]}>
+            
+            <View style={styles.animationWrapper}>
+                <LeafAnimation trigger={activeIndex} />
+            </View>
             
             <Animated.View style={[
                 styles.indicatorContainer, 
-                { width: TAB_WIDTH, direction: 'ltr' }, 
+                { width: TAB_WIDTH, left: 0 }, 
                 indicatorAnimatedStyle
             ]}>
                 <View style={[styles.indicator(theme), { backgroundColor: theme.tabBarIndicator }]}>
@@ -552,42 +765,24 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language })
                 </View>
             </Animated.View>
 
-            {routes.map((route, index) => {
+            {orderedRoutes.map((route, index) => {
                 const descriptor = descriptors[route.key];
                 const { options } = descriptor;
-                const isFocused = state.routes[state.index].key === route.key;
+                const isFocused = currentActiveRouteName === route.name;
+
                 const onPress = () => {
                     const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                    if (!isFocused && !event.defaultPrevented) {
-                        navigation.navigate(route.name);
-                    }
+                    if (!isFocused && !event.defaultPrevented) { navigation.navigate(route.name); }
                 };
-                
-                const iconAnimatedStyle = useAnimatedStyle(() => ({
-                    transform: [{ translateY: withTiming(isFocused ? -32 : 0, { duration: 500 }) }],
-                }));
-                const textAnimatedStyle = useAnimatedStyle(() => ({
-                    opacity: withTiming(isFocused ? 1 : 0, { duration: 500 }),
-                    transform: [{ translateY: withTiming(isFocused ? 10 : 20, { duration: 500 }) }],
-                }));
-                
+
+                const iconAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: withTiming(isFocused ? -32 : 0, { duration: 500 }) }], }));
+                const textAnimatedStyle = useAnimatedStyle(() => ({ opacity: withTiming(isFocused ? 1 : 0, { duration: 500 }), transform: [{ translateY: withTiming(isFocused ? 10 : 20, { duration: 500 }) }], }));
                 const isProfileTab = route.name === 'ProfileStack';
                 
                 return (
                     <TouchableOpacity key={route.key} style={[styles.tabItem, { width: TAB_WIDTH, zIndex: 1 }]} onPress={onPress}>
                         <Animated.View style={[styles.tabIconContainer, iconAnimatedStyle]}>
-                            {isProfileTab ? (
-                                <Image
-                                    source={profileImage ? { uri: profileImage } : require('./assets/profile.png')}
-                                    style={styles.profileTabIcon}
-                                />
-                            ) : (
-                                <Ionicons
-                                    name={options.tabBarIconName || 'alert-circle-outline'}
-                                    size={28}
-                                    color={isFocused ? theme.textPrimary : theme.tabBarIcon}
-                                />
-                            )}
+                            {isProfileTab ? ( <Image source={profileImage ? { uri: profileImage } : require('./assets/profile.png')} style={styles.profileTabIcon} /> ) : ( <Ionicons name={options.tabBarIconName || 'alert-circle-outline'} size={28} color={isFocused ? theme.textPrimary : theme.tabBarIcon} /> )}
                         </Animated.View>
                         <Animated.Text style={[styles.tabText(theme), textAnimatedStyle]}>{options.tabBarLabel}</Animated.Text>
                     </TouchableOpacity>
@@ -596,6 +791,7 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language })
         </View>
     );
 };
+
 
 const Tab = createBottomTabNavigator();
 const DiaryStack = createStackNavigator();
@@ -662,19 +858,12 @@ function MainUIScreen({ appLanguage }) {
         }
         const onBackPress = () => {
             if (!navState) { return false; }
-            
             const mainUIRoute = navState.routes.find(route => route.name === 'MainUI');
             if (!mainUIRoute || !mainUIRoute.state) { return false; }
-
             const tabState = mainUIRoute.state;
             const currentTabRoute = tabState.routes[tabState.index];
-
             const isTabAtRoot = !currentTabRoute.state || currentTabRoute.state.index === 0;
-
-            if (isTabAtRoot) {
-                BackHandler.exitApp();
-                return true; 
-            }
+            if (isTabAtRoot) { BackHandler.exitApp(); return true; }
             return false;
         };
         BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -700,23 +889,13 @@ function MainUIScreen({ appLanguage }) {
       try {
         await registerForPushNotificationsAsync();
         Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: false, }), });
-        
         const settingsRaw = await AsyncStorage.getItem('reminderSettings');
         const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
-
         if(settings.stepsGoal?.enabled) {
             const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(STEPS_NOTIFICATION_TASK);
-            if (!isTaskRegistered) {
-                await BackgroundFetch.registerTaskAsync(STEPS_NOTIFICATION_TASK, {
-                    minimumInterval: 15 * 60,
-                    stopOnTerminate: false,
-                    startOnBoot: true,
-                });
-            }
+            if (!isTaskRegistered) { await BackgroundFetch.registerTaskAsync(STEPS_NOTIFICATION_TASK, { minimumInterval: 15 * 60, stopOnTerminate: false, startOnBoot: true, }); }
         }
-      } catch (error) { 
-        console.error("Error setting up initial tasks:", error); 
-      }
+      } catch (error) { console.error("Error setting up initial tasks:", error); }
     };
     setupInitialTasks();
   }, []);
@@ -729,7 +908,7 @@ function MainUIScreen({ appLanguage }) {
         const routeName = getFocusedRouteNameFromRoute(route);
         const screensToHideTabBar = ['Weight', 'Water', 'WorkoutLog', 'Steps', 'FoodLogDetail', 'EditProfile', 'Settings', 'About'];
         if (screensToHideTabBar.includes(routeName)) { return null; }
-        return <MagicLineTabBar {...props} theme={theme} t={t} />;
+        return <MagicLineTabBar {...props} theme={theme} t={t} language={language} />;
       }}
     >
       <Tab.Screen name="DiaryStack" options={{ tabBarLabel: t('diaryTab'), tabBarIconName: 'journal-outline' }}>
@@ -739,12 +918,7 @@ function MainUIScreen({ appLanguage }) {
           {props => <ReportsStackNavigator {...props} theme={theme} language={language} />}
       </Tab.Screen>
       <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: t('cameraTab'), tabBarIconName: 'camera-outline' }} />
-      <Tab.Screen 
-        name="ProfileStack" 
-        options={{ 
-          tabBarLabel: t('profileTab'),
-        }}
-      >
+      <Tab.Screen name="ProfileStack" options={{ tabBarLabel: t('profileTab'), }}>
         {props => <ProfileStackNavigator {...props} theme={theme} t={t} onThemeChange={handleThemeChange} appLanguage={appLanguage} />}
       </Tab.Screen>
     </Tab.Navigator>
@@ -756,32 +930,12 @@ const styles = StyleSheet.create({
     container: { paddingHorizontal: 20, paddingBottom: 80 }, 
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15 }), 
     dateNavContainer: (theme) => ({ marginVertical: 10, backgroundColor: theme.card, borderRadius: 20, paddingVertical: 15, paddingHorizontal: 10 }), 
-    dateNavHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
-        paddingHorizontal: 5,
-    },
+    dateNavHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingHorizontal: 5, },
     arrowButton: { padding: 5 }, 
-    dateNavMonthText: (theme) => ({
-        flex: 1,
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: theme.textPrimary,
-        textAlign: 'center',
-        marginHorizontal: 10,
-    }), 
-    weekContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 10
-    },
+    dateNavMonthText: (theme) => ({ flex: 1, fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'center', marginHorizontal: 10, }), 
+    weekContainer: { justifyContent: 'space-around', marginBottom: 10 },
     weekDayText: (theme) => ({ fontSize: 14, color: theme.textSecondary, fontWeight: '500', width: 40, textAlign: 'center' }), 
-    datesContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around'
-    }, 
+    datesContainer: { justifyContent: 'space-around' }, 
     dateCircle: { width: 40, height: 40, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
     dateText: (theme) => ({ fontSize: 16, color: theme.textPrimary, fontWeight: '600' }), 
     activeText: (theme) => ({ color: theme.white }), 
@@ -791,23 +945,23 @@ const styles = StyleSheet.create({
     remainingCaloriesText: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.textPrimary }), 
     remainingLabel: (theme) => ({ fontSize: 14, color: theme.textSecondary }), 
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.indicatorDot, borderWidth: 3, borderColor: theme.card }), 
-    sectionHeaderContainer: { marginTop: 15, marginBottom: 10, alignItems: 'flex-start' }, 
-    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', marginBottom: 0, flexShrink: 1 }),
-    sectionDescription: (theme) => ({ fontSize: 14, color: theme.textSecondary, textAlign: 'left' }),
-    mealSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingBottom: 10, },
-    mealSectionHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
+    sectionHeaderContainer: { marginTop: 15, marginBottom: 10, }, 
+    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 0, flexShrink: 1 }),
+    sectionDescription: (theme) => ({ fontSize: 14, color: theme.textSecondary, }),
+    mealSectionHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingBottom: 10, },
+    mealSectionHeaderLeft: { alignItems: 'center' },
     mealIcon: { marginEnd: 10 }, 
     mealSectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary }), 
     mealSectionTotalCalories: (theme) => ({ fontSize: 16, color: theme.textSecondary, fontWeight: '600' }), 
-    mealMacrosContainer: (theme) => ({ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', marginTop: 15, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.background, flexWrap: 'wrap' }), 
+    mealMacrosContainer: (theme) => ({ justifyContent: 'flex-start', alignItems: 'center', marginTop: 15, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.background, flexWrap: 'wrap' }), 
     macroSummaryItem: { marginEnd: 20, marginBottom: 5 }, 
     macroSummaryText: (theme) => ({ fontSize: 13, color: theme.textSecondary, fontWeight: '600' }), 
     smartAddButton: (theme) => ({ marginTop: 15, paddingVertical: 15, borderRadius: 15, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', width: '100%' }), 
     smartAddButtonText: (theme) => ({ color: theme.white, fontSize: 18, fontWeight: 'bold' }), 
     disabledButton: (theme) => ({ backgroundColor: theme.disabled }), 
-    readOnlyBanner: (theme) => ({ backgroundColor: theme.readOnlyBanner, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 15 }), 
-    readOnlyBannerText: (theme) => ({ color: theme.white, fontSize: 14, fontWeight: 'bold', flex: 1, textAlign: 'left' }), 
-    nutrientRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, }, 
+    readOnlyBanner: (theme) => ({ backgroundColor: theme.readOnlyBanner, borderRadius: 10, padding: 10, alignItems: 'center', marginBottom: 15 }), 
+    readOnlyBannerText: (theme) => ({ color: theme.white, fontSize: 14, fontWeight: 'bold', flex: 1 }), 
+    nutrientRowHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, }, 
     nutrientRowContainer: { marginBottom: 15, }, 
     nutrientRowLabel: (theme) => ({ fontSize: 16, color: theme.textPrimary, fontWeight: '600', }), 
     nutrientRowValue: (theme) => ({ fontSize: 14, color: theme.textSecondary, }), 
@@ -815,7 +969,7 @@ const styles = StyleSheet.create({
     tabItem: { height: 70, justifyContent: 'center', alignItems: 'center' }, 
     tabIconContainer: { width: 60, height: 60, justifyContent: 'center', alignItems: 'center', },
     tabText: (theme) => ({ position: 'absolute', color: theme.tabBarIcon, fontSize: 12, fontWeight: '400' }), 
-    indicatorContainer: { position: 'absolute', top: -35, left: 0, height: INDICATOR_DIAMETER, alignItems: 'center', zIndex: 0 }, 
+    indicatorContainer: { position: 'absolute', top: -35, height: INDICATOR_DIAMETER, alignItems: 'center', zIndex: 0 }, 
     indicator: (theme) => ({ width: INDICATOR_DIAMETER, height: INDICATOR_DIAMETER, borderRadius: INDICATOR_DIAMETER / 2, borderWidth: 6, borderColor: theme.background }), 
     cutout: { position: 'absolute', top: '50%', width: 20, height: 20, backgroundColor: 'transparent', shadowOpacity: 1, shadowRadius: 0 }, 
     cutoutLeft: (theme) => ({ left: -22, borderTopRightRadius: 20, shadowColor: theme.background, shadowOffset: { width: 1, height: -10 } }), 
@@ -834,14 +988,14 @@ const styles = StyleSheet.create({
     resultItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'transparent', padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' }, 
     foodName: (theme) => ({ fontSize: 16, color: theme.textPrimary }), 
     emptyText: (theme) => ({ textAlign: 'center', marginTop: 50, fontSize: 16, color: theme.textSecondary }), 
-    dashboardGridContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, flexWrap: 'wrap', rowGap: 15, }, 
+    dashboardGridContainer: { justifyContent: 'space-between', marginBottom: 15, flexWrap: 'wrap', rowGap: 15, }, 
     smallCard: (theme) => ({ width: '48.5%', backgroundColor: theme.card, borderRadius: 20, padding: 15, minHeight: 120, justifyContent: 'space-between', }), 
-    smallCardHeader: { flexDirection: 'row', alignItems: 'center', }, 
+    smallCardHeader: { alignItems: 'center', }, 
     smallCardIconContainer: (theme) => ({ width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.progressUnfilled }), 
     smallCardTitle: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginStart: 8 }), 
-    smallCardValue: (theme) => ({ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', }), 
+    smallCardValue: (theme) => ({ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, }), 
     smallCardSubValue: (theme) => ({ fontSize: 14, color: theme.textSecondary, textAlign: 'left', marginTop: -5, }), 
-    smallCardContent: { alignItems: 'flex-start' }, 
+    smallCardContent: { }, 
     waterVisualizerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap', rowGap: 5, }, 
     waterDropIcon: { marginHorizontal: 1, }, 
     stepsCardContent: { flex: 1, justifyContent: 'center', alignItems: 'center' }, 
@@ -849,19 +1003,19 @@ const styles = StyleSheet.create({
     stepsCardTextContainer: { position: 'absolute', }, 
     stepsCardCountText: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, }), 
     stepsCardGoalText: (theme) => ({ fontSize: 13, color: theme.textSecondary, marginTop: 2, }), 
-    foodLogItemContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }, 
+    foodLogItemContainer: { alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }, 
     foodLogItemImage: { width: 50, height: 50, borderRadius: 10, marginEnd: 15, }, 
     foodLogItemImagePlaceholder: (theme) => ({ width: 50, height: 50, borderRadius: 10, marginEnd: 15, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', }), 
     foodLogItemDetails: { flex: 1, }, 
-    foodLogItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, }, 
-    foodLogItemName: (theme) => ({ fontSize: 16, fontWeight : '600', color: theme.textPrimary, flex: 1, textAlign: 'left', }), 
+    foodLogItemHeader: { justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, }, 
+    foodLogItemName: (theme) => ({ fontSize: 16, fontWeight : '600', color: theme.textPrimary, flex: 1, }), 
     foodLogItemCalories: (theme) => ({ fontSize: 14, fontWeight: '500', color: theme.primary, marginStart: 8, }), 
-    foodLogItemMacros: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 6, }, 
+    foodLogItemMacros: { alignItems: 'center', flexWrap: 'wrap', marginTop: 6, }, 
     macroText: (theme) => ({ fontSize: 13, color: theme.textSecondary, marginEnd: 15, marginBottom: 4, }), 
     dailyLogCard: { paddingVertical: 18, paddingHorizontal: 15, }, 
-    dailyLogContentContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', }, 
-    dailyLogLeftContainer: { flexDirection: 'row', alignItems: 'center', }, 
-    foodPreviewContainer: { flexDirection: 'row', alignItems: 'center', }, 
+    dailyLogContentContainer: { justifyContent: 'space-between', alignItems: 'center', }, 
+    dailyLogLeftContainer: { alignItems: 'center', }, 
+    foodPreviewContainer: { alignItems: 'center', }, 
     previewImage: (theme) => ({ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: theme.card, backgroundColor: '#f0f0f0', }), 
     previewImagePlaceholder: (theme) => ({ justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }), 
     previewCounterCircle: (theme) => ({ width: 38, height: 38, borderRadius: 19, backgroundColor: theme.progressUnfilled, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: theme.card, }), 
