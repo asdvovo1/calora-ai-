@@ -38,6 +38,7 @@ const STEPS_NOTIFICATION_TASK = 'steps-notification-task';
 
 TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
     try {
+        // 1. التأكد إن التنبيه مفعل من الإعدادات
         const settingsRaw = await AsyncStorage.getItem('reminderSettings');
         const settings = settingsRaw ? JSON.parse(settingsRaw) : {};
         
@@ -45,6 +46,7 @@ TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
             return BackgroundFetch.BackgroundFetchResult.NoData;
         }
 
+        // 2. التأكد إننا بعتناش الإشعار النهاردة قبل كده
         const start = new Date();
         start.setHours(0, 0, 0, 0);
         const todaySentKey = `@steps_goal_sent_${start.toISOString().slice(0, 10)}`;
@@ -54,26 +56,62 @@ TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
             return BackgroundFetch.BackgroundFetchResult.NoData;
         }
 
-        if (Platform.OS === 'android') {
-             return BackgroundFetch.BackgroundFetchResult.NoData;
-        }
-
+        // 3. جلب الهدف
         const savedGoal = await AsyncStorage.getItem('stepsGoal');
         const goal = savedGoal ? parseInt(savedGoal, 10) : 10000;
-        
-        const isAvailable = await Pedometer.isAvailableAsync();
-        if (!isAvailable) {
-            return BackgroundFetch.BackgroundFetchResult.Failed;
+
+        let currentSteps = 0;
+
+        // 4. جلب الخطوات (حسب نوع الجهاز)
+        if (Platform.OS === 'android') {
+            // ✅ للأندرويد: نستخدم Google Fit
+            const isConnected = await AsyncStorage.getItem('isGoogleFitConnected');
+            if (isConnected === 'true') {
+                // محاولة الاتصال الصامت (Silent Auth)
+                const options = {
+                    scopes: [
+                        GoogleFit.Scopes.FITNESS_ACTIVITY_READ,
+                        GoogleFit.Scopes.FITNESS_BODY_READ,
+                    ],
+                };
+                const authResult = await GoogleFit.authorize(options);
+                
+                if (authResult.success) {
+                    const now = new Date();
+                    const opt = {
+                        startDate: start.toISOString(),
+                        endDate: now.toISOString(),
+                        bucketUnit: 'DAY',
+                        bucketInterval: 1
+                    };
+                    const res = await GoogleFit.getDailyStepCountSamples(opt);
+                    if (res && res.length > 0) {
+                        res.forEach(source => {
+                            if (source.steps && source.steps.length > 0) {
+                                const val = source.steps[0].value;
+                                if (val > currentSteps) currentSteps = val;
+                            }
+                        });
+                    }
+                }
+            }
+        } else {
+            // ✅ للآيفون: نستخدم Pedometer العادي (لأنه شغال كويس هناك)
+            const isAvailable = await Pedometer.isAvailableAsync();
+            if (isAvailable) {
+                const { steps } = await Pedometer.getStepCountAsync(start, new Date());
+                currentSteps = steps;
+            }
         }
 
-        const { steps } = await Pedometer.getStepCountAsync(start, new Date());
-
-        if (steps >= goal) {
+        // 5. المقارنة وإرسال الإشعار
+        if (currentSteps >= goal) {
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: "🎉 هدف الخطوات مكتمل!",
-                    body: `رائع! لقد حققت هدفك اليومي وهو ${goal.toLocaleString()} خطوة.`,
+                    title: "🎉 عاش يا بطل!",
+                    body: `إنجاز رائع! كملت هدفك اليومي (${goal.toLocaleString()} خطوة).`,
                     sound: true,
+                    priority: Notifications.AndroidNotificationPriority.HIGH,
                 },
                 trigger: null,
             });
@@ -83,7 +121,7 @@ TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
         
         return BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (error) {
-        console.error("Error occurred in background steps task:", error);
+        console.error("Background task error:", error);
         return BackgroundFetch.BackgroundFetchResult.Failed;
     }
 });
