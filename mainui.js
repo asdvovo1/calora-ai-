@@ -506,7 +506,7 @@ const MagicLineTabBar = ({ state, descriptors, navigation, theme, t, language })
 
     const getTabPosition = (index) => {
         const positions = isRTL 
-            ? [0, 1, 2, 3]  
+            ? [0, -1, -2, -3]  
             : [0, -1, -2, -3]; 
         
         return positions[index] * TAB_WIDTH;
