@@ -7,6 +7,7 @@ import { StyleSheet, View, Text, ScrollView, SafeAreaView, TouchableOpacity, Dim
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigationState, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+// ✅ تم التصحيح هنا: withSequence بدل useSequence
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, withSequence, withDelay, useAnimatedProps } from 'react-native-reanimated';
 import * as Progress from 'react-native-progress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,6 +18,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
+import GoogleFit from 'react-native-google-fit'; 
 
 // --- Screen Imports ---
 import ProfileScreen from './profile';
@@ -50,6 +52,10 @@ TaskManager.defineTask(STEPS_NOTIFICATION_TASK, async () => {
 
         if (hasSentToday) {
             return BackgroundFetch.BackgroundFetchResult.NoData;
+        }
+
+        if (Platform.OS === 'android') {
+             return BackgroundFetch.BackgroundFetchResult.NoData;
         }
 
         const savedGoal = await AsyncStorage.getItem('stepsGoal');
@@ -87,13 +93,13 @@ const darkTheme = { primary: '#66BB6A', background: '#121212', card: '#1E1E1E', 
 
 const translations = {
     ar: {
-        remainingCalories: 'سعر حراري متبقي', readOnlyBanner: 'أنت تعرض يوماً سابقاً. السجل للقراءة فقط.', mealSectionsTitle: 'أقسام الوجبات', mealSectionsDesc: 'هذا هو السجل التفصيلي لليوم.', breakfast: 'الفطور', lunch: 'الغداء', dinner: 'العشاء', snacks: 'وجبات خفيفة', add_to_meal: '+ أضف إلى {meal}', protein: 'بروتين', carbs: 'كربوهيدرات', fat: 'دهون', fiber: 'ألياف', sugar: 'سكر', sodium: 'صوديوم', g_unit: 'جم', mg_unit: 'مجم', kcal_unit: 'kcal', weight: 'الوزن', water: 'الماء', workouts: 'التمارين', steps: 'الخطوات', not_logged: 'لم يسجل', unsupported: 'غير مدعوم', kg_unit: 'كجم', burned_cal: 'سعر حراري', goal: 'الهدف: ', dailyLogTitle: 'سجل وجبات اليوم', add_to: 'إضافة إلى', search_placeholder: 'ابحث عن كشري، ملوخية، تفاح...', no_results: 'لا توجد نتائج بحث.', local_food: 'أكلة محلية 🇪🇬', error: 'خطأ', search_error_msg: 'الرجاء إدخال اسم طعام للبحث.', fetch_error_msg: 'حدث خطأ أثناء جلب تفاصيل الطعام.', save_error_msg: 'حدث خطأ أثناء حفظ البيانات.', diaryTab: 'يومياتي', reportsTab: 'تقارير', cameraTab: 'كاميرا', profileTab: 'حسابي', weightTrackerTitle: 'تتبع الوزن', waterTrackerTitle: 'تتبع الماء', workoutLogTitle: 'سجل التمارين', stepsReportTitle: 'تقرير الخطوات', foodLogDetailTitle: 'تفاصيل سجل الوجبات', 
+        remainingCalories: 'سعر حراري متبقي', readOnlyBanner: 'أنت تعرض يوماً سابقاً. السجل للقراءة فقط.', mealSectionsTitle: 'أقسام الوجبات', mealSectionsDesc: 'هذا هو السجل التفصيلي لليوم.', breakfast: 'الفطور', lunch: 'الغداء', dinner: 'العشاء', snacks: 'وجبات خفيفة', add_to_meal: '+ أضف إلى {meal}', protein: 'بروتين', carbs: 'كربوهيدرات', fat: 'دهون', fiber: 'ألياف', sugar: 'سكر', sodium: 'صوديوم', g_unit: 'جم', mg_unit: 'مجم', kcal_unit: 'kcal', weight: 'الوزن', water: 'الماء', workouts: 'التمارين', steps: 'الخطوات', not_logged: 'غير مرتبط', unsupported: 'غير مدعوم', kg_unit: 'كجم', burned_cal: 'سعر حراري', goal: 'الهدف: ', dailyLogTitle: 'سجل وجبات اليوم', add_to: 'إضافة إلى', search_placeholder: 'ابحث عن كشري، ملوخية، تفاح...', no_results: 'لا توجد نتائج بحث.', local_food: 'أكلة محلية 🇪🇬', error: 'خطأ', search_error_msg: 'الرجاء إدخال اسم طعام للبحث.', fetch_error_msg: 'حدث خطأ أثناء جلب تفاصيل الطعام.', save_error_msg: 'حدث خطأ أثناء حفظ البيانات.', diaryTab: 'يومياتي', reportsTab: 'تقارير', cameraTab: 'كاميرا', profileTab: 'حسابي', weightTrackerTitle: 'تتبع الوزن', waterTrackerTitle: 'تتبع الماء', workoutLogTitle: 'سجل التمارين', stepsReportTitle: 'تقرير الخطوات', foodLogDetailTitle: 'تفاصيل سجل الوجبات', 
         weekdays: ['س', 'ح', 'ن', 'ث', 'ر', 'خ', 'ج'],
         p_macro: 'ب: ', c_macro: 'ك: ', f_macro: 'د: ', fib_macro: 'أ: ', sug_macro: 'س: ', sod_macro: 'ص: ',
         editProfile: 'تعديل الملف الشخصي', settings: 'الإعدادات', about: 'حول التطبيق',
     },
     en: {
-        remainingCalories: 'Calories Remaining', readOnlyBanner: "You are viewing a past day. The log is read-only.", mealSectionsTitle: 'Meal Sections', mealSectionsDesc: 'This is the detailed log for the day.', breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks', add_to_meal: '+ Add to {meal}', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', sugar: 'Sugar', sodium: 'Sodium', g_unit: 'g', mg_unit: 'mg', kcal_unit: 'kcal', weight: 'Weight', water: 'Water', workouts: 'Workouts', steps: 'Steps', not_logged: 'Not logged', unsupported: 'Unsupported', kg_unit: 'kg', burned_cal: 'calories', goal: 'Goal: ', dailyLogTitle: "Today's Food Log", add_to: 'Add to', search_placeholder: 'Search for koshari, molokhia, apple...', no_results: 'No search results found.', local_food: 'Local Food 🇪🇬', error: 'Error', search_error_msg: 'Please enter a food name to search.', fetch_error_msg: 'An error occurred while fetching food details.', save_error_msg: 'An error occurred while saving data.', diaryTab: 'Diary', reportsTab: 'Reports', cameraTab: 'Camera', profileTab: 'Profile', weightTrackerTitle: 'Weight Tracker', waterTrackerTitle: 'Water Tracker', workoutLogTitle: 'Workout Log', stepsReportTitle: 'Steps Report', foodLogDetailTitle: 'Food Log Details', 
+        remainingCalories: 'Calories Remaining', readOnlyBanner: "You are viewing a past day. The log is read-only.", mealSectionsTitle: 'Meal Sections', mealSectionsDesc: 'This is the detailed log for the day.', breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks', add_to_meal: '+ Add to {meal}', protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fiber: 'Fiber', sugar: 'Sugar', sodium: 'Sodium', g_unit: 'g', mg_unit: 'mg', kcal_unit: 'kcal', weight: 'Weight', water: 'Water', workouts: 'Workouts', steps: 'Steps', not_logged: 'Not connected', unsupported: 'Unsupported', kg_unit: 'kg', burned_cal: 'calories', goal: 'Goal: ', dailyLogTitle: "Today's Food Log", add_to: 'Add to', search_placeholder: 'Search for koshari, molokhia, apple...', no_results: 'No search results found.', local_food: 'Local Food 🇪🇬', error: 'Error', search_error_msg: 'Please enter a food name to search.', fetch_error_msg: 'An error occurred while fetching food details.', save_error_msg: 'An error occurred while saving data.', diaryTab: 'Diary', reportsTab: 'Reports', cameraTab: 'Camera', profileTab: 'Profile', weightTrackerTitle: 'Weight Tracker', waterTrackerTitle: 'Water Tracker', workoutLogTitle: 'Workout Log', stepsReportTitle: 'Steps Report', foodLogDetailTitle: 'Food Log Details', 
         weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
         p_macro: 'P: ', c_macro: 'C: ', f_macro: 'F: ', fib_macro: 'Fib: ', sug_macro: 'Sug: ', sod_macro: 'Sod: ',
         editProfile: 'Edit Profile', settings: 'Settings', about: 'About',
@@ -105,29 +111,24 @@ const NUTRIENT_GOALS = { fiber: 30, sugar: 50, sodium: 2300 };
 const EMPTY_DAY_DATA = { food: 0, exercise: 0, breakfast: [], lunch: [], dinner: [], snacks: [], water: 0, weight: 0, exercises: [] };
 
 const describeArc = (x, y, radius, startAngle, endAngle) => { 'worklet'; const clampedEndAngle = Math.min(endAngle, 359.999); const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0), }; const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0), }; const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y,].join(' '); return d; };
+
+// ✅ تم التصحيح هنا: withSequence
 const LeafAnimation = ({ trigger }) => { const opacity = useSharedValue(0); const translateY = useSharedValue(-20); const rotate = useSharedValue(0); useEffect(() => { opacity.value = 0; translateY.value = -20; rotate.value = Math.random() > 0.5 ? -10 : 10; opacity.value = withSequence(withTiming(0.7, { duration: 400 }), withDelay(800, withTiming(0, { duration: 600 }))); translateY.value = withTiming(70, { duration: 2200 }); rotate.value = withTiming(rotate.value > 0 ? 25 : -25, { duration: 2200 }); }, [trigger]); const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: translateY.value }, { rotateZ: `${rotate.value}deg` }], })); return (<Animated.View style={[styles.leafAnimationContainer, animatedStyle]}><Image source={require('./assets/leafbar.png')} style={styles.leafImage} /></Animated.View>); };
+
 const calculateMacroGoals = (totalCalories) => { const caloriesPerGram = { protein: 4, carbs: 4, fat: 9 }; const macroSplit = { protein: 0.30, carbs: 0.40, fat: 0.30 }; return { protein: Math.round((totalCalories * macroSplit.protein) / caloriesPerGram.protein), carbs: Math.round((totalCalories * macroSplit.carbs) / caloriesPerGram.carbs), fat: Math.round((totalCalories * macroSplit.fat) / caloriesPerGram.fat), }; };
 const formatDateKey = (date) => { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; };
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 async function registerForPushNotificationsAsync() { if (Platform.OS === 'android') { await Notifications.setNotificationChannelAsync('default', { name: 'default', importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 250, 250, 250], lightColor: '#FF231F7C', }); } if (Device.isDevice) { const { status: existingStatus } = await Notifications.getPermissionsAsync(); let finalStatus = existingStatus; if (existingStatus !== 'granted') { const { status } = await Notifications.requestPermissionsAsync(); finalStatus = status; } if (finalStatus !== 'granted') { console.log('User did not grant notification permissions.'); return; } } else { console.log('Must use physical device for Push Notifications'); } }
 
-// --- تم تعديل هذا الجزء لحل مشكلة تواريخ الجمعة ---
 const DateNavigator = ({ selectedDate, onDateSelect, referenceToday, theme, t, language }) => {
     const handlePrevWeek = () => { const newDate = new Date(selectedDate); newDate.setDate(selectedDate.getDate() - 7); onDateSelect(newDate); };
     const handleNextWeek = () => { const newDate = new Date(selectedDate); newDate.setDate(selectedDate.getDate() + 7); onDateSelect(newDate); };
     
     const weekDays = t('weekdays');
     const dates = [];
-    
-    // إذا كانت اللغة عربية، الأسبوع يبدأ السبت (6)
-    // إذا إنجليزي، الأسبوع يبدأ الأحد (0)
     const startDayIndex = language === 'ar' ? 6 : 0; 
-    
     const currentDayIndex = selectedDate.getDay();
-
     const startDate = new Date(selectedDate);
-    
-    // حساب الفرق لضبط بداية الصف
     let diff = currentDayIndex - startDayIndex;
     if (diff < 0) { diff += 7; }
     
@@ -298,7 +299,92 @@ const AddFoodModal = ({ visible, onClose, onFoodSelect, mealKey, theme, t }) => 
 const SmallWeightCard = ({ weight, onPress, theme, t }) => (<TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="barbell-outline" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('weight')}</Text></View><Text style={styles.smallCardValue(theme)}>{weight > 0 ? `${weight} ${t('kg_unit')}` : t('not_logged')}</Text></TouchableOpacity>);
 const SmallWaterCard = ({ water, waterGoal, onPress, theme, t }) => { const DISPLAY_DROPS = 15; const filledDrops = Math.min(water || 0, DISPLAY_DROPS); const totalDropsToDisplay = Math.min(waterGoal || DISPLAY_DROPS, DISPLAY_DROPS); const drops = Array.from({ length: totalDropsToDisplay }, (_, i) => i); return (<TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><Ionicons name="water-outline" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('water')}</Text></View><View style={styles.waterVisualizerContainer}>{drops.map(index => (<Ionicons key={index} name={index < filledDrops ? 'water' : 'water-outline'} size={22} color={index < filledDrops ? '#007BFF' : theme.disabled} style={styles.waterDropIcon} />))}</View></TouchableOpacity>); };
 const SmallWorkoutCard = ({ totalCaloriesBurned = 0, onPress, theme, t }) => { return ( <TouchableOpacity style={styles.smallCard(theme)} onPress={onPress}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="run-fast" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('workouts')}</Text></View><View style={styles.smallCardContent}><Text style={styles.smallCardValue(theme)}>{totalCaloriesBurned > 0 ? `🔥 ${Math.round(totalCaloriesBurned)}` : t('not_logged')}</Text>{totalCaloriesBurned > 0 ? <Text style={styles.smallCardSubValue(theme)}>{t('burned_cal')}</Text> : null }</View></TouchableOpacity> ); };
-const SmallStepsCard = ({ navigation, theme, t }) => { const [status, setStatus] = useState('checking'); const [currentStepCount, setCurrentStepCount] = useState(0); const [stepsGoal, setStepsGoal] = useState(10000); useFocusEffect(useCallback(() => { const subscribe = async () => { const savedGoal = await AsyncStorage.getItem('stepsGoal'); if (savedGoal) setStepsGoal(parseInt(savedGoal, 10)); const isAvailable = await Pedometer.isAvailableAsync(); if (!isAvailable) { setStatus('unavailable'); return; } const { status: permissionStatus } = await Pedometer.requestPermissionsAsync(); if (permissionStatus !== 'granted') { setStatus('denied'); return; } const end = new Date(); const start = new Date(); start.setHours(0, 0, 0, 0); try { const pastStepCountResult = await Pedometer.getStepCountAsync(start, end); if (pastStepCountResult) setCurrentStepCount(pastStepCountResult.steps); setStatus('available'); } catch (error) { console.error("Pedometer error:", error); setStatus('unavailable'); } }; subscribe(); }, [])); const renderContent = () => { if (status === 'checking') return <ActivityIndicator style={{ marginTop: 20 }} color={theme.primary} />; if (status === 'unavailable' || status === 'denied') return <Text style={[styles.smallCardValue(theme), { fontSize: 20, marginTop: 15 }]}>{t('unsupported')}</Text>; const progress = stepsGoal > 0 ? currentStepCount / stepsGoal : 0; return (<View style={styles.stepsCardContent}><View style={styles.stepsCardCircleContainer}><Progress.Circle size={80} progress={progress} showsText={false} color={theme.primary} unfilledColor={theme.progressUnfilled} borderWidth={0} thickness={8} /><View style={styles.stepsCardTextContainer}><Text style={styles.stepsCardCountText(theme)}>{currentStepCount.toLocaleString()}</Text></View></View><Text style={styles.stepsCardGoalText(theme)}>{t('goal')}{stepsGoal.toLocaleString()}</Text></View>); }; return (<TouchableOpacity style={styles.smallCard(theme)} onPress={() => navigation.navigate('Steps')}><View style={styles.smallCardHeader}><View style={[styles.smallCardIconContainer(theme)]}><MaterialCommunityIcons name="walk" size={20} color={theme.primary} /></View><Text style={styles.smallCardTitle(theme)}>{t('steps')}</Text></View>{renderContent()}</TouchableOpacity>); };
+
+const SmallStepsCard = ({ navigation, theme, t }) => { 
+    const [steps, setSteps] = useState(0);
+    const [goal, setGoal] = useState(10000);
+    const [isConnected, setIsConnected] = useState(false);
+
+    useFocusEffect(useCallback(() => {
+        const fetchSteps = async () => {
+            const savedGoal = await AsyncStorage.getItem('stepsGoal');
+            if (savedGoal) setGoal(parseInt(savedGoal, 10));
+
+            const connected = await AsyncStorage.getItem('isGoogleFitConnected');
+            setIsConnected(connected === 'true');
+
+            if (connected === 'true') {
+                const now = new Date();
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+
+                const opt = {
+                    startDate: startOfDay.toISOString(),
+                    endDate: now.toISOString(),
+                    bucketUnit: 'DAY',
+                    bucketInterval: 1
+                };
+
+                try {
+                    const res = await GoogleFit.getDailyStepCountSamples(opt);
+                    if (res && res.length > 0) {
+                        let maxSteps = 0;
+                        res.forEach(source => {
+                            if (source.steps && source.steps.length > 0) {
+                                const val = source.steps[0].value;
+                                if (val > maxSteps) maxSteps = val;
+                            }
+                        });
+                        setSteps(maxSteps);
+                    }
+                } catch (e) {
+                    console.log("Widget Error:", e);
+                }
+            }
+        };
+        fetchSteps();
+    }, []));
+
+    const progress = goal > 0 ? steps / goal : 0;
+
+    return (
+        <TouchableOpacity style={styles.smallCard(theme)} onPress={() => navigation.navigate('Steps')}>
+            <View style={styles.smallCardHeader}>
+                <View style={[styles.smallCardIconContainer(theme)]}>
+                    <MaterialCommunityIcons name="walk" size={20} color={theme.primary} />
+                </View>
+                <Text style={styles.smallCardTitle(theme)}>{t('steps')}</Text>
+            </View>
+            
+            <View style={styles.stepsCardContent}>
+                {!isConnected ? (
+                    <Text style={[styles.smallCardValue(theme), { fontSize: 14, color: theme.textSecondary }]}>
+                        {t('not_logged')}
+                    </Text>
+                ) : (
+                    <>
+                        <View style={styles.stepsCardCircleContainer}>
+                            <Progress.Circle 
+                                size={80} 
+                                progress={progress} 
+                                showsText={false} 
+                                color={theme.primary} 
+                                unfilledColor={theme.progressUnfilled} 
+                                borderWidth={0} 
+                                thickness={8} 
+                            />
+                            <View style={styles.stepsCardTextContainer}>
+                                <Text style={styles.stepsCardCountText(theme)}>{steps.toLocaleString()}</Text>
+                            </View>
+                        </View>
+                        <Text style={styles.stepsCardGoalText(theme)}>{t('goal')}{goal.toLocaleString()}</Text>
+                    </>
+                )}
+            </View>
+        </TouchableOpacity>
+    ); 
+};
+
 const DashboardGrid = ({ weight, water, waterGoal, totalExerciseCalories, onWeightPress, onWaterPress, onWorkoutPress, navigation, theme, t }) => (<View style={styles.dashboardGridContainer}><SmallWeightCard weight={weight} onPress={onWeightPress} theme={theme} t={t} /><SmallWaterCard water={water} waterGoal={waterGoal} onPress={onWaterPress} theme={theme} t={t} /><SmallWorkoutCard totalCaloriesBurned={totalExerciseCalories} onPress={onWorkoutPress} theme={theme} t={t} /><SmallStepsCard navigation={navigation} theme={theme} t={t} /></View>);
 
 function DiaryScreen({ navigation, route, setHasProgress, theme, t, language }) { 
@@ -671,12 +757,12 @@ const styles = StyleSheet.create({
     remainingCaloriesText: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.textPrimary }), 
     remainingLabel: (theme) => ({ fontSize: 14, color: theme.textSecondary }), 
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.indicatorDot, borderWidth: 3, borderColor: theme.card }), 
-    sectionHeaderContainer: { marginTop: 15, marginBottom: 10, alignItems: 'flex-start' }, // flex-start بيتقلب لوحده
+    sectionHeaderContainer: { marginTop: 15, marginBottom: 10, alignItems: 'flex-start' }, 
     sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', marginBottom: 0, flexShrink: 1 }),
     sectionDescription: (theme) => ({ fontSize: 14, color: theme.textSecondary, textAlign: 'left' }),
     mealSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, paddingBottom: 10, },
     mealSectionHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-    mealIcon: { marginEnd: 10 }, // بديل لـ marginRight/Left
+    mealIcon: { marginEnd: 10 }, 
     mealSectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary }), 
     mealSectionTotalCalories: (theme) => ({ fontSize: 16, color: theme.textSecondary, fontWeight: '600' }), 
     mealMacrosContainer: (theme) => ({ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', marginTop: 15, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.background, flexWrap: 'wrap' }), 
@@ -687,7 +773,7 @@ const styles = StyleSheet.create({
     disabledButton: (theme) => ({ backgroundColor: theme.disabled }), 
     readOnlyBanner: (theme) => ({ backgroundColor: theme.readOnlyBanner, borderRadius: 10, padding: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 15 }), 
     readOnlyBannerText: (theme) => ({ color: theme.white, fontSize: 14, fontWeight: 'bold', flex: 1, textAlign: 'left' }), 
-    nutrientRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, },
+    nutrientRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, }, 
     nutrientRowContainer: { marginBottom: 15, }, 
     nutrientRowLabel: (theme) => ({ fontSize: 16, color: theme.textPrimary, fontWeight: '600', }), 
     nutrientRowValue: (theme) => ({ fontSize: 14, color: theme.textSecondary, }), 

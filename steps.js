@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     StyleSheet, View, Text, ScrollView, SafeAreaView, TouchableOpacity, 
-    ActivityIndicator, Alert, Modal, TextInput, StatusBar, Platform, AppState
+    ActivityIndicator, Alert, Modal, TextInput, StatusBar, Platform, AppState, Linking
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Pedometer } from 'expo-sensors';
+import GoogleFit, { Scopes } from 'react-native-google-fit'; // ✅ استبدال Pedometer بـ GoogleFit
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -19,15 +19,15 @@ const lightTheme = { primary: '#388E3C', primaryDark: '#1B5E20', background: '#E
 const darkTheme = { primary: '#66BB6A', primaryDark: '#81C784', background: '#121212',  card: '#1E1E1E',  textPrimary: '#FFFFFF',  textSecondary: '#B0B0B0', progressUnfilled: '#2C2C2C', inputBackground: '#2C2C2C',  overlay: 'rgba(0,0,0,0.7)', accentOrange: '#FF8A65', accentBlue: '#42A5F5', white: '#FFFFFF', statusBar: 'light-content', };
 
 const translations = { 
-    ar: { todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'غير متوفر', notAvailableMsg: 'مستشعر عداد الخطوات غير متوفر أو لم يتم منح الصلاحية (جرب عمل Build جديد).', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى تمكين صلاحية "النشاط البدني" من إعدادات الهاتف.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, 
-    en: { todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Not Available', notAvailableMsg: 'Pedometer sensor not available or permission missing (Try rebuilding app).', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable Physical Activity permission.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } 
+    ar: { todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'Google Fit غير متصل', notAvailableMsg: 'يرجى ربط حساب Google Fit لعرض الخطوات.', connectBtn: 'ربط Google Fit', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى منح صلاحية النشاط البدني.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, 
+    en: { todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Google Fit Not Connected', notAvailableMsg: 'Please connect Google Fit to track steps.', connectBtn: 'Connect Google Fit', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable Physical Activity permission.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } 
 };
 
 // --- دوال مساعدة للرسم ---
 const describeArc = (x, y, radius, startAngle, endAngle) => { const clampedEndAngle = Math.min(endAngle, 359.999); const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0) }; const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0) }; const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y].join(' '); return d; };
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-// --- مكون الدائرة المتحركة (تم تصحيح موضع النقطة هنا) ---
+// --- مكون الدائرة المتحركة ---
 const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, theme }) => { 
     const INDICATOR_SIZE = strokeWidth * 1.5; 
     const RADIUS = size / 2; 
@@ -49,12 +49,10 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
         const xCenter = (size / 2) + CENTER_RADIUS * Math.cos(angleRad);
         const yCenter = (size / 2) + CENTER_RADIUS * Math.sin(angleRad);
         
-        // ** التعديل هنا: قيمة الإزاحة الأفقية. (موجب = لليمين، سالب = لليسار)**
         const HORIZONTAL_OFFSET = -155; 
         
         return { 
             transform: [
-                // إضافة الإزاحة الأفقية إلى translateX
                 { translateX: xCenter - INDICATOR_SIZE / 2 + HORIZONTAL_OFFSET }, 
                 { translateY: yCenter - INDICATOR_SIZE / 2 }
             ], 
@@ -65,33 +63,10 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
     return ( 
         <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
             <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                <Circle 
-                    cx={size / 2} 
-                    cy={size / 2} 
-                    r={CENTER_RADIUS} 
-                    stroke={theme.progressUnfilled} 
-                    strokeWidth={strokeWidth} 
-                    fill="transparent" 
-                />
-                <AnimatedPath 
-                    animatedProps={animatedPathProps} 
-                    stroke={theme.primary} 
-                    strokeWidth={strokeWidth} 
-                    fill="transparent" 
-                    strokeLinecap="round" 
-                />
+                <Circle cx={size / 2} cy={size / 2} r={CENTER_RADIUS} stroke={theme.progressUnfilled} strokeWidth={strokeWidth} fill="transparent" />
+                <AnimatedPath animatedProps={animatedPathProps} stroke={theme.primary} strokeWidth={strokeWidth} fill="transparent" strokeLinecap="round" />
             </Svg>
-            <Animated.View 
-                style={[ 
-                    styles.progressIndicatorDot(theme), 
-                    { 
-                        width: INDICATOR_SIZE, 
-                        height: INDICATOR_SIZE, 
-                        borderRadius: INDICATOR_SIZE / 2, 
-                    }, 
-                    indicatorAnimatedStyle 
-                ]} 
-            />
+            <Animated.View style={[ styles.progressIndicatorDot(theme), { width: INDICATOR_SIZE, height: INDICATOR_SIZE, borderRadius: INDICATOR_SIZE / 2, }, indicatorAnimatedStyle ]} />
             <View style={styles.summaryTextContainer}>
                 <Text style={styles.progressCircleText(theme)}>{currentStepCount.toLocaleString()}</Text>
             </View>
@@ -111,145 +86,198 @@ const StepsScreen = () => {
     const [stepsGoal, setStepsGoal] = useState(10000);
     const [historicalData, setHistoricalData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isPedometerAvailable, setIsPedometerAvailable] = useState(true);
+    const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
     const [isPromptVisible, setPromptVisible] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState('week');
-
-    const pedometerSubscription = useRef(null);
     
-    const subscribeToPedometer = async () => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date();
-        
+    // إعدادات Google Fit
+    const options = {
+        scopes: [
+            Scopes.FITNESS_ACTIVITY_READ,
+            Scopes.FITNESS_BODY_READ,
+        ],
+    };
+
+    const t = (key) => translations[language]?.[key] || translations['en'][key];
+
+    // دالة الاتصال بجوجل فت
+    const connectGoogleFit = async () => {
         try {
-            const pastStepCountResult = await Pedometer.getStepCountAsync(start, end);
-            if (pastStepCountResult) {
-                setCurrentStepCount(pastStepCountResult.steps);
+            const res = await GoogleFit.authorize(options);
+            if (res.success) {
+                setIsGoogleFitConnected(true);
+                AsyncStorage.setItem('isGoogleFitConnected', 'true');
+                fetchGoogleFitData(); // جلب البيانات فوراً
+            } else {
+                setIsGoogleFitConnected(false);
+                AsyncStorage.setItem('isGoogleFitConnected', 'false');
             }
         } catch (error) {
-            console.log("Could not get initial step count:", error);
+            console.warn("Google Fit Auth Error:", error);
+            setIsGoogleFitConnected(false);
         }
+    };
 
-        if (pedometerSubscription.current) {
-            pedometerSubscription.current.remove();
-        }
+    // جلب البيانات من جوجل فت
+    const fetchGoogleFitData = async () => {
+        setLoading(true);
+        const now = new Date();
+        const startOfDay = new Date();
+        startOfDay.setHours(0,0,0,0);
         
-        pedometerSubscription.current = Pedometer.watchStepCount(result => {
-            setCurrentStepCount(result.steps); 
-        });
-    };
+        // 1. جلب خطوات اليوم
+        const todayOpts = {
+            startDate: startOfDay.toISOString(),
+            endDate: now.toISOString(),
+            bucketUnit: 'DAY',
+            bucketInterval: 1
+        };
 
-    const unsubscribeFromPedometer = () => {
-        if (pedometerSubscription.current) {
-            pedometerSubscription.current.remove();
-            pedometerSubscription.current = null;
+        try {
+            const todayRes = await GoogleFit.getDailyStepCountSamples(todayOpts);
+            // Google Fit بيرجع مصادر كتير، بنحاول ناخد المصدر المدمج (Estimated)
+            // لو مفيش، بناخد أكبر قيمة فيهم عشان نتجنب التكرار
+            if (todayRes && todayRes.length > 0) {
+                let maxSteps = 0;
+                todayRes.forEach(source => {
+                    if (source.steps && source.steps.length > 0) {
+                        const val = source.steps[0].value;
+                        if (val > maxSteps) maxSteps = val;
+                    }
+                });
+                setCurrentStepCount(maxSteps);
+            } else {
+                setCurrentStepCount(0);
+            }
+        } catch (e) {
+            console.log("Error fetching today steps:", e);
+        }
+
+        // 2. جلب التاريخ (Chart)
+        const daysToFetch = 30;
+        const historyStart = new Date();
+        historyStart.setDate(historyStart.getDate() - daysToFetch);
+        historyStart.setHours(0,0,0,0);
+
+        const historyOpts = {
+            startDate: historyStart.toISOString(),
+            endDate: now.toISOString(),
+            bucketUnit: 'DAY',
+            bucketInterval: 1
+        };
+
+        try {
+            const historyRes = await GoogleFit.getDailyStepCountSamples(historyOpts);
+            
+            // تجهيز البيانات للرسم البياني
+            // بنحتاج ندمج المصادر (Merge Sources) لنفس اليوم
+            const stepsByDay = {};
+            
+            if (historyRes) {
+                historyRes.forEach(source => {
+                    source.steps.forEach(step => {
+                        // step.date بيجي string، بنحوله لـ YYYY-MM-DD
+                        const dateStr = step.date.slice(0, 10); 
+                        if (!stepsByDay[dateStr] || step.value > stepsByDay[dateStr]) {
+                             // بناخد أكبر قيمة لنفس اليوم (عشان نتفادى تكرار الساعات والتليفون)
+                             stepsByDay[dateStr] = step.value;
+                        }
+                    });
+                });
+            }
+
+            // تحويل الـ Map لـ Array مرتب
+            const formattedData = [];
+            for (let i = 0; i < daysToFetch; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateKey = d.toISOString().slice(0, 10);
+                const dayName = d.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' });
+                
+                formattedData.push({
+                    day: dayName,
+                    steps: stepsByDay[dateKey] || 0
+                });
+            }
+
+            // معالجة العرض (أسبوعي / شهري)
+            const localT = (key) => translations[language]?.[key] || translations['en'][key];
+
+            if (selectedPeriod === 'week') {
+                setHistoricalData(formattedData.slice(0, 7).reverse());
+            } else {
+                const weeklyData = [];
+                for (let w = 0; w < 4; w++) {
+                    let weekTotal = 0;
+                    for (let d = 0; d < 7; d++) {
+                        const index = (w * 7) + d;
+                        if (formattedData[index]) {
+                            weekTotal += formattedData[index].steps;
+                        }
+                    }
+                    weeklyData.push({
+                        day: `${localT('week')} ${4 - w}`,
+                        steps: weekTotal
+                    });
+                }
+                setHistoricalData(weeklyData.reverse());
+            }
+
+        } catch (e) {
+            console.log("Error fetching history:", e);
+        } finally {
+            setLoading(false);
         }
     };
-    
+
     useFocusEffect(
         useCallback(() => {
             let isMounted = true;
             
-            const fetchData = async () => {
-                setLoading(true);
-                try {
-                    const savedTheme = await AsyncStorage.getItem('isDarkMode');
-                    if (isMounted) setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
-                    
-                    const savedLang = await AsyncStorage.getItem('appLanguage');
-                    const currentLang = savedLang || 'en';
-                    if (isMounted) setLanguage(currentLang);
-                    
-                    const savedGoal = await AsyncStorage.getItem('stepsGoal');
-                    if (isMounted && savedGoal) setStepsGoal(parseInt(savedGoal, 10));
+            const init = async () => {
+                const savedTheme = await AsyncStorage.getItem('isDarkMode');
+                if (isMounted) setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
+                
+                const savedLang = await AsyncStorage.getItem('appLanguage');
+                const currentLang = savedLang || 'en';
+                if (isMounted) setLanguage(currentLang);
+                
+                const savedGoal = await AsyncStorage.getItem('stepsGoal');
+                if (isMounted && savedGoal) setStepsGoal(parseInt(savedGoal, 10));
 
-                    const perm = await Pedometer.requestPermissionsAsync();
-                    const isAvailable = await Pedometer.isAvailableAsync();
-                    
-                    if (isMounted) {
-                        setIsPedometerAvailable(perm.granted || isAvailable);
+                // التحقق من حالة الاتصال
+                const isConnected = await AsyncStorage.getItem('isGoogleFitConnected');
+                
+                if (isConnected === 'true') {
+                    // تحقق سريع هل لسه معانا الصلاحية
+                    const checkAuth = await GoogleFit.checkIsAuthorized();
+                    if (checkAuth) {
+                         setIsGoogleFitConnected(true);
+                         fetchGoogleFitData();
+                    } else {
+                         // محاولة إعادة الاتصال الصامت
+                         connectGoogleFit();
                     }
-
-                    if (!perm.granted) {
-                         if (isMounted) {
-                             setLoading(false);
-                             setIsPedometerAvailable(false); 
-                         }
-                         return;
-                    }
-
-                    try {
-                        await subscribeToPedometer();
-                    } catch(e) { console.log("Sub err", e); }
-
-                    // --- هنا الإصلاح ---
-                    const daysToFetch = 30; 
-                    let rawDaysData = [];
-                    
-                    for (let i = 0; i < daysToFetch; i++) {
-                        const dayEnd = new Date(); dayEnd.setDate(dayEnd.getDate() - i); dayEnd.setHours(23, 59, 59, 999);
-                        const dayStart = new Date(dayEnd); dayStart.setHours(0, 0, 0, 0);
-                        
-                        // 1. نحسب اسم اليوم هنا قبل ما نحاول نجيب البيانات
-                        // عشان لو فشل الجلب، يفضل الاسم معانا
-                        let dayName = dayStart.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' });
-
-                        try {
-                            const dayResult = await Pedometer.getStepCountAsync(dayStart, dayEnd);
-                            
-                            rawDaysData.push({ 
-                                day: dayName, // بنستخدم الاسم اللي حسبناه فوق
-                                steps: dayResult ? dayResult.steps : 0 
-                            });
-                        } catch (e) {
-                             // لو حصل خطأ في الحساس، بنحط الخطوات 0 بس بنحط اسم اليوم الصحيح
-                             rawDaysData.push({ day: dayName, steps: 0 });
-                        }
-                    }
-
-                    if (isMounted) {
-                        const localT = (key) => translations[currentLang]?.[key] || translations['en'][key];
-                        
-                        if (selectedPeriod === 'week') {
-                            setHistoricalData(rawDaysData.slice(0, 7).reverse());
-                        } else {
-                            const weeklyData = [];
-                            for (let w = 0; w < 4; w++) {
-                                let weekTotal = 0;
-                                for (let d = 0; d < 7; d++) {
-                                    const index = (w * 7) + d;
-                                    if (rawDaysData[index]) {
-                                        weekTotal += rawDaysData[index].steps;
-                                    }
-                                }
-                                weeklyData.push({
-                                    day: `${localT('week')} ${4 - w}`,
-                                    steps: weekTotal
-                                });
-                            }
-                            setHistoricalData(weeklyData.reverse());
-                        }
-                    }
-
-                } catch (error) {
-                    console.error("Error fetching step data:", error);
-                    if (isMounted) setIsPedometerAvailable(false);
-                } finally {
-                    if (isMounted) setLoading(false);
+                } else {
+                    // لم يتم الاتصال من قبل
+                    setIsGoogleFitConnected(false);
+                    setLoading(false);
                 }
             };
             
-            fetchData();
+            init();
+
+            // تحديث دوري (اختياري)
+            const interval = setInterval(() => {
+                if (isGoogleFitConnected) fetchGoogleFitData();
+            }, 60000); // كل دقيقة
 
             return () => {
                 isMounted = false;
-                unsubscribeFromPedometer();
+                clearInterval(interval);
             };
-        }, [selectedPeriod])
+        }, [selectedPeriod, isGoogleFitConnected])
     );
-    
-    const t = (key) => translations[language]?.[key] || translations['en'][key];
     
     const handleSaveGoalFromPrompt = (text) => {
         const newGoal = parseInt(text, 10);
@@ -278,17 +306,15 @@ const StepsScreen = () => {
         if (loading) {
             return <ActivityIndicator size="large" color={theme.primary} style={{ height: 180, marginBottom: 79 }} />;
         }
-        if (!isPedometerAvailable) {
+        if (!isGoogleFitConnected) {
             return (
                 <View style={styles.errorContainer}>
-                    <MaterialCommunityIcons name="motion-sensor-off" size={48} color={theme.textSecondary} />
+                    <MaterialCommunityIcons name="google-fit" size={48} color={theme.textSecondary} />
                     <Text style={styles.errorText(theme)}>{t('notAvailableTitle')}</Text>
                     <Text style={styles.errorSubText(theme)}>{t('notAvailableMsg')}</Text>
-                    {Platform.OS === 'android' && (
-                        <Text style={{marginTop:10, color:'red', fontSize:12, textAlign:'center'}}>
-                            {t('permissionDeniedMsg')}
-                        </Text>
-                    )}
+                    <TouchableOpacity style={styles.connectButton(theme)} onPress={connectGoogleFit}>
+                        <Text style={styles.connectButtonText}>{t('connectBtn')}</Text>
+                    </TouchableOpacity>
                 </View>
             );
         }
@@ -296,7 +322,6 @@ const StepsScreen = () => {
             <>
                 <AnimatedStepsCircle size={180} strokeWidth={15} currentStepCount={currentStepCount} progress={stepsGoal > 0 ? currentStepCount / stepsGoal : 0} theme={theme} />
                 <View style={styles.subStatsContainer}>
-                    {/* تم عكس الترتيب ليتناسب مع الصورة الأصلية (RTL) */}
                     <TouchableOpacity style={styles.subStatBox} onPress={() => setPromptVisible(true)}>
                         <MaterialCommunityIcons name="flag-checkered" size={24} color={theme.accentBlue} />
                         <Text style={styles.subStatText(theme)}>{stepsGoal.toLocaleString()}</Text>
@@ -323,38 +348,41 @@ const StepsScreen = () => {
                     <Text style={styles.todaySummaryLabel(theme)}>{t('todaySteps')}</Text>
                     {renderTodaySummary()}
                 </View>
-                <View style={styles.card(theme)}>
-                    <View style={styles.periodToggleContainer(theme)}>
-                        {/* عكس الترتيب ليتناسب مع الـ RTL والصورة الأصلية */}
-                        <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'month' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('month')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'month' && styles.activePeriodText(theme)]}>{t('last30Days')}</Text></TouchableOpacity>
-                        <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'week' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('week')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'week' && styles.activePeriodText(theme)]}>{t('last7Days')}</Text></TouchableOpacity>
+                {isGoogleFitConnected && (
+                <>
+                    <View style={styles.card(theme)}>
+                        <View style={styles.periodToggleContainer(theme)}>
+                            <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'month' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('month')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'month' && styles.activePeriodText(theme)]}>{t('last30Days')}</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'week' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('week')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'week' && styles.activePeriodText(theme)]}>{t('last7Days')}</Text></TouchableOpacity>
+                        </View>
+                        <Text style={styles.sectionTitle(theme)}>{t('periodSummary').replace('{period}', periodLabel)}</Text>
+                        {loading ? <ActivityIndicator color={theme.primary}/> : historicalData.length > 0 ? 
+                        <View style={styles.chartContainer}>
+                            {historicalData.map((item, index) => ( 
+                                <View key={index} style={styles.barWrapper}>
+                                    <View style={[
+                                        styles.bar(theme), 
+                                        {
+                                            height: `${(item.steps / maxChartSteps) * 100}%`,
+                                            width: selectedPeriod === 'month' ? '60%' : '75%' 
+                                        }
+                                    ]} />
+                                    <Text style={styles.barLabel(theme)} numberOfLines={1}>{item.day}</Text>
+                                </View> 
+                            ))}
+                        </View> 
+                        : <Text style={styles.emptyLogText(theme)}>{t('noData')}</Text>}
                     </View>
-                    <Text style={styles.sectionTitle(theme)}>{t('periodSummary').replace('{period}', periodLabel)}</Text>
-                    {loading ? <ActivityIndicator color={theme.primary}/> : historicalData.length > 0 ? 
-                    <View style={styles.chartContainer}>
-                        {historicalData.map((item, index) => ( 
-                            <View key={index} style={styles.barWrapper}>
-                                <View style={[
-                                    styles.bar(theme), 
-                                    {
-                                        height: `${(item.steps / maxChartSteps) * 100}%`,
-                                        width: selectedPeriod === 'month' ? '60%' : '75%' 
-                                    }
-                                ]} />
-                                <Text style={styles.barLabel(theme)} numberOfLines={1}>{item.day}</Text>
-                            </View> 
-                        ))}
-                    </View> 
-                    : <Text style={styles.emptyLogText(theme)}>{t('noData')}</Text>}
-                </View>
-                <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme)}>{t('periodStats').replace('{period}', periodLabel)}</Text>
-                    {loading ? <ActivityIndicator color={theme.primary}/> : <>
-                        <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('avgSteps')}</Text><Text style={styles.statValue(theme)}>{averagePeriodSteps.toLocaleString()}</Text></View>
-                        <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('totalSteps').replace('{period}', periodLabel)}</Text><Text style={styles.statValue(theme)}>{totalPeriodSteps.toLocaleString()}</Text></View>
-                        <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{selectedPeriod === 'week' ? t('bestDay').replace('{period}', periodLabel) : `${t('week')} الأفضل:`}</Text><Text style={styles.statValue(theme)}>{bestDayInPeriod.toLocaleString()}</Text></View>
-                    </>}
-                </View>
+                    <View style={styles.card(theme)}>
+                        <Text style={styles.sectionTitle(theme)}>{t('periodStats').replace('{period}', periodLabel)}</Text>
+                        {loading ? <ActivityIndicator color={theme.primary}/> : <>
+                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('avgSteps')}</Text><Text style={styles.statValue(theme)}>{averagePeriodSteps.toLocaleString()}</Text></View>
+                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('totalSteps').replace('{period}', periodLabel)}</Text><Text style={styles.statValue(theme)}>{totalPeriodSteps.toLocaleString()}</Text></View>
+                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{selectedPeriod === 'week' ? t('bestDay').replace('{period}', periodLabel) : `${t('week')} الأفضل:`}</Text><Text style={styles.statValue(theme)}>{bestDayInPeriod.toLocaleString()}</Text></View>
+                        </>}
+                    </View>
+                </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -364,7 +392,7 @@ const styles = {
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
-    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'right', marginBottom: 4, marginTop: 15 }), // تم تغيير textAlign إلى right لتناسب RTL
+    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'right', marginBottom: 4, marginTop: 15 }),
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
@@ -373,7 +401,7 @@ const styles = {
     subStatsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 },
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'rtl' }, // تم إضافة direction: 'rtl'
+    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'rtl' }, 
     
     barWrapper: { flex: 1, alignItems: 'center' }, 
     barLabel: (theme) => ({ 
@@ -397,16 +425,17 @@ const styles = {
     promptButtonPrimary: (theme) => ({ backgroundColor: theme.primary }),
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
-    // تم حذف الهوامش السالبة من هنا، لأن التصحيح تم داخل useAnimatedStyle
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'rtl' }), // تم إضافة direction: 'rtl'
+    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'rtl' }),
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),
     activePeriodText: (theme) => ({ color: theme.primary }),
     errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', height: 180, marginBottom: 79 },
     errorText: (theme) => ({ marginTop: 15, fontSize: 20, fontWeight: 'bold', color: theme.textPrimary }),
-    errorSubText: (theme) => ({ marginTop: 5, fontSize: 14, color: theme.textSecondary, textAlign: 'center', paddingHorizontal: 20 }),
+    errorSubText: (theme) => ({ marginTop: 5, fontSize: 14, color: theme.textSecondary, textAlign: 'center', paddingHorizontal: 20, marginBottom: 20 }),
+    connectButton: (theme) => ({ backgroundColor: theme.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10 }),
+    connectButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 };
 
 export default StepsScreen;

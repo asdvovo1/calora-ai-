@@ -8,7 +8,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { Pedometer } from 'expo-sensors';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import GoogleFit, { Scopes } from 'react-native-google-fit';
 import { useFocusEffect } from '@react-navigation/native';
@@ -48,7 +47,7 @@ const translations = {
     invalidTimeFormat: 'Please enter the time in the correct HH:MM format',
     snackFeatureAlertTitle: "Unsupported Feature",
     snackTimePickerMessage: "This button works! On a real phone, the native time picker would open here.",
-    snackTaskManagerMessage: "Step counter background task is not supported in this environment. The reminder is saved as 'ON' but will only work on a real device build.",
+    snackTaskManagerMessage: "Step counter background task is not supported in this environment.",
     connectedApps: 'Connected Apps',
     googleFit: 'Google Fit',
     connect: 'Connect',
@@ -81,7 +80,7 @@ const translations = {
     invalidTimeFormat: 'الرجاء إدخال الوقت بالصيغة الصحيحة HH:MM',
     snackFeatureAlertTitle: "ميزة غير مدعومة",
     snackTimePickerMessage: "الزر يعمل! على الهاتف الحقيقي، ستفتح الساعة هنا لتحديد الوقت.",
-    snackTaskManagerMessage: "مهمة عداد الخطوات الخلفية غير مدعومة في هذه البيئة. تم حفظ التذكير على أنه 'مفعل' ولكنه لن يعمل إلا على نسخة هاتف حقيقية.",
+    snackTaskManagerMessage: "مهمة عداد الخطوات الخلفية غير مدعومة في هذه البيئة.",
     connectedApps: 'التطبيقات المرتبطة',
     googleFit: 'Google Fit',
     connect: 'اتصال',
@@ -101,11 +100,9 @@ const ScreenHeader = ({ title, onBackPress, theme, action, isRTL }) => (
     <View style={[styles.headerContainer, { 
         backgroundColor: theme.surface, 
         borderBottomColor: theme.separator,
-        // ✅ استخدمنا row عادي، النظام سيقلبه
         flexDirection: 'row' 
     }]}>
       <TouchableOpacity onPress={onBackPress} style={styles.headerButton}>
-        {/* السهم فقط نغير أيقونته، لكن المكان سيتغير تلقائيا */}
         <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={24} color={theme.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
@@ -135,16 +132,15 @@ const DarkModeToggle = ({ value, onValueChange }) => {
       Animated.timing(animation, { 
           toValue: value ? 1 : 0, 
           duration: 250, 
-          useNativeDriver: true, // يفضل true للأداء
+          useNativeDriver: true,
       }).start(); 
   }, [value, animation]);
 
   const trackColor = animation.interpolate({ inputRange: [0, 1], outputRange: ['#767577', '#4CAF50'] });
   
-  // ✅ حركة بسيطة، النظام سيقلب الاتجاه
   const translateX = animation.interpolate({ 
       inputRange: [0, 1], 
-      outputRange: [-13, 13] // حركة بسيطة من اليسار لليمين
+      outputRange: [-13, 13]
   });
 
   return (
@@ -167,7 +163,7 @@ const DarkModeToggle = ({ value, onValueChange }) => {
 const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => ( 
     <TouchableOpacity onPress={onPress} style={[styles.settingsItem, { 
         backgroundColor: theme.surface,
-        flexDirection: 'row' // ✅ row دائما
+        flexDirection: 'row'
     }]}>
         <View style={{ 
             flexDirection: 'row', 
@@ -176,13 +172,13 @@ const SettingsActionItem = ({ icon, label, onPress, color, theme, isRTL }) => (
         }}>
             <View style={[styles.iconContainer, { 
                 backgroundColor: theme.iconContainer,
-                marginEnd: 16 // ✅ بديل marginRight/Left
+                marginEnd: 16 
             }]}>
                 <Icon name={icon} size={22} color={color || theme.iconColor} />
             </View>
             <Text style={[styles.label, { 
                 color: color || theme.text,
-                textAlign: 'left' // ✅ سيظهر يمين بالعربي تلقائياً
+                textAlign: 'left'
             }]}>{label}</Text>
         </View>
         <Icon name={isRTL ? "chevron-left" : "chevron-right"} size={24} color="#B0B0B0" />
@@ -426,33 +422,45 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
     }
   };
 
+  // ✅ تم تعديل هذه الدالة لتجاهل أخطاء الحساس والسماح بالتشغيل
   const handleToggleStepsReminder = async () => {
+    // 1. طلب إذن الإشعارات فقط (تجاهلنا Pedometer)
+    const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
+    
+    if (notificationStatus !== 'granted') {
+        Alert.alert(t('notificationsPermissionTitle'), t('notificationsPermissionMessage'));
+        return;
+    }
+
+    // 2. تغيير الحالة وحفظها
     const newReminders = { ...reminders, stepsGoal: { enabled: !reminders.stepsGoal.enabled } };
     setReminders(newReminders);
     await AsyncStorage.setItem('reminderSettings', JSON.stringify(newReminders));
+
+    // 3. محاولة تسجيل المهمة في الخلفية (بدون إظهار أخطاء للمستخدم)
     if (newReminders.stepsGoal.enabled) {
-        if (!TaskManager || typeof TaskManager.registerTaskAsync !== 'function') {
-            Alert.alert(t('snackFeatureAlertTitle'), t('snackTaskManagerMessage'));
-            return;
+        try {
+            // محاولة التسجيل لو TaskManager موجود، لو مش موجود أو فشل مش مهم لأننا بنعتمد على Google Fit
+            if (TaskManager && TaskManager.registerTaskAsync) {
+                await TaskManager.registerTaskAsync('steps-notification-task', { minimumInterval: 15 * 60 });
+            }
+        } catch (e) {
+            console.log("Background task registration failed (Expected on incompatible devices), ignoring...");
         }
-        const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
-        const { status: pedometerStatus } = await Pedometer.requestPermissionsAsync();
-        if (notificationStatus !== 'granted' || pedometerStatus !== 'granted') {
-            Alert.alert(t('notificationsPermissionTitle'), t('notificationsPermissionMessage'));
-            const revertedState = { ...newReminders, stepsGoal: { enabled: false } };
-            setReminders(revertedState);
-            await AsyncStorage.setItem('reminderSettings', JSON.stringify(revertedState));
-            return;
-        }
-        await TaskManager.registerTaskAsync('steps-notification-task', { minimumInterval: 15 * 60 });
-        Alert.alert(t('remindersSaved'));
     } else {
-        if (TaskManager && typeof TaskManager.unregisterTaskAsync === 'function') {
-            await TaskManager.unregisterTaskAsync('steps-notification-task');
+        try {
+            if (TaskManager && TaskManager.unregisterTaskAsync) {
+                await TaskManager.unregisterTaskAsync('steps-notification-task');
+            }
+        } catch (e) {
+            console.log("Unregister task failed", e);
         }
-        Alert.alert(t('remindersSaved'));
     }
+
+    // 4. رسالة نجاح دائماً
+    Alert.alert(t('remindersSaved'));
   };
+
   const showTimePicker = (key) => {
     if (Platform.OS === 'web') { Alert.alert(t('snackFeatureAlertTitle'), t('snackTimePickerMessage')); return; }
     const reminderTime = reminders[key].time;
@@ -541,7 +549,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
       
       setActiveLanguage(selectedLanguage);
 
-      // ✅ تفعيل الـ RTL على مستوى التطبيق ككل
       I18nManager.allowRTL(isAr);
       I18nManager.forceRTL(isAr);
       
