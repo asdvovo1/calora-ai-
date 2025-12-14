@@ -422,25 +422,17 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
     }
   };
 
-  // ✅ تم تعديل هذه الدالة لتجاهل أخطاء الحساس والسماح بالتشغيل
   const handleToggleStepsReminder = async () => {
-    // 1. طلب إذن الإشعارات فقط (تجاهلنا Pedometer)
     const { status: notificationStatus } = await Notifications.requestPermissionsAsync();
-    
     if (notificationStatus !== 'granted') {
         Alert.alert(t('notificationsPermissionTitle'), t('notificationsPermissionMessage'));
         return;
     }
-
-    // 2. تغيير الحالة وحفظها
     const newReminders = { ...reminders, stepsGoal: { enabled: !reminders.stepsGoal.enabled } };
     setReminders(newReminders);
     await AsyncStorage.setItem('reminderSettings', JSON.stringify(newReminders));
-
-    // 3. محاولة تسجيل المهمة في الخلفية (بدون إظهار أخطاء للمستخدم)
     if (newReminders.stepsGoal.enabled) {
         try {
-            // محاولة التسجيل لو TaskManager موجود، لو مش موجود أو فشل مش مهم لأننا بنعتمد على Google Fit
             if (TaskManager && TaskManager.registerTaskAsync) {
                 await TaskManager.registerTaskAsync('steps-notification-task', { minimumInterval: 15 * 60 });
             }
@@ -456,8 +448,6 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
             console.log("Unregister task failed", e);
         }
     }
-
-    // 4. رسالة نجاح دائماً
     Alert.alert(t('remindersSaved'));
   };
 
@@ -541,6 +531,7 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
   };
   const handleDisconnectGoogleFit = async () => { try { await GoogleFit.disconnect(); setIsGoogleFitConnected(false); await AsyncStorage.setItem('isGoogleFitConnected', 'false'); Alert.alert("Google Fit", t('disconnectSuccess')); } catch (error) { console.error("DISCONNECT_ERROR", error); } };
 
+  // ✅ تم إصلاح هذه الدالة لمنع الـ Crash
   const handleSaveLanguage = async () => {
     if (activeLanguage === selectedLanguage) { setCurrentView('main'); return; }
     try {
@@ -549,7 +540,8 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
       
       setActiveLanguage(selectedLanguage);
 
-      I18nManager.allowRTL(isAr);
+      // ✅ التعديل: نسمح بالـ RTL دائماً ونغير الـ Force فقط
+      I18nManager.allowRTL(true);
       I18nManager.forceRTL(isAr);
       
       Alert.alert(
@@ -558,13 +550,16 @@ const SettingsScreen = ({ navigation, onThemeChange, appLanguage }) => {
         [ 
             { 
                 text: 'OK', 
-                onPress: async () => { 
-                    try {
-                        await Updates.reloadAsync();
-                    } catch(e) {
-                       console.log("Error reloading", e);
-                       Alert.alert("Error", "Please close and reopen the app to apply changes.");
-                    }
+                onPress: () => { 
+                    // ✅ هام: تأخير بسيط قبل الريلود عشان نضمن إن البيانات اتكتبت والواجهة استقرت
+                    setTimeout(async () => {
+                        try {
+                            await Updates.reloadAsync();
+                        } catch(e) {
+                           console.log("Reload error", e);
+                           Alert.alert("Note", "Please close and reopen the app manually.");
+                        }
+                    }, 1000); 
                 }, 
             }, 
         ], 

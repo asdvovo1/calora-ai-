@@ -10,7 +10,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { supabase } from './supabaseclient';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// ❌ شيلنا Updates عشان هو اللي كان بيعمل الـ Loop
 
 import SplashScreen from './Splash'; 
 import IndexScreen from './Index';
@@ -61,12 +60,13 @@ const App = () => {
         const currentLang = savedLang || 'en';
         const isRTLRequired = currentLang === 'ar';
 
-        // ✅ التصحيح: بنجبر التطبيق يغير الاتجاه للمرة الجاية
-        // بس مش بنعمل reloadAsync عشان ميعملش Loop
+        // ✅ هام: السماح بـ RTL دائماً أولاً لمنع الأخطاء
+        I18nManager.allowRTL(true);
+
+        // ✅ إذا كان الاتجاه الحالي مختلف، نغيره (لكن بدون إعادة تشغيل إجبارية في هذه المرحلة)
         if (I18nManager.isRTL !== isRTLRequired) {
-            I18nManager.allowRTL(isRTLRequired);
             I18nManager.forceRTL(isRTLRequired);
-            // التغيير ده هيطبق 100% لما اليوزر يقفل التطبيق ويفتحه تاني
+            // هذا التغيير سيطبق بالكامل عند إعادة التشغيل القادمة
         }
 
         setAppLanguage(currentLang);
