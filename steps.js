@@ -6,7 +6,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import GoogleFit, { Scopes } from 'react-native-google-fit'; // ✅ استبدال Pedometer بـ GoogleFit
+import GoogleFit, { Scopes, BucketUnit } from 'react-native-google-fit'; 
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, useAnimatedProps } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -24,7 +24,14 @@ const translations = {
 };
 
 // --- دوال مساعدة للرسم ---
-const describeArc = (x, y, radius, startAngle, endAngle) => { const clampedEndAngle = Math.min(endAngle, 359.999); const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0) }; const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0) }; const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y].join(' '); return d; };
+const describeArc = (x, y, radius, startAngle, endAngle) => { 
+    const clampedEndAngle = Math.min(endAngle, 359.999); 
+    const start = { x: x + radius * Math.cos((startAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((startAngle - 90) * Math.PI / 180.0) }; 
+    const end = { x: x + radius * Math.cos((clampedEndAngle - 90) * Math.PI / 180.0), y: y + radius * Math.sin((clampedEndAngle - 90) * Math.PI / 180.0) }; 
+    const largeArcFlag = clampedEndAngle - startAngle <= 180 ? '0' : '1'; 
+    const d = ['M', start.x, start.y, 'A', radius, radius, 0, largeArcFlag, 1, end.x, end.y].join(' '); 
+    return d; 
+};
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // --- مكون الدائرة المتحركة ---
@@ -32,15 +39,17 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
     const INDICATOR_SIZE = strokeWidth * 1.5; 
     const RADIUS = size / 2; 
     const CENTER_RADIUS = RADIUS - strokeWidth / 2; 
+    
+    const safeProgress = isNaN(progress) ? 0 : Math.min(Math.max(progress, 0), 1);
     const animatedProgress = useSharedValue(0); 
     
     useEffect(() => { 
-        animatedProgress.value = withTiming(progress, { duration: 800 }); 
-    }, [progress]); 
+        animatedProgress.value = withTiming(safeProgress, { duration: 1000 }); 
+    }, [safeProgress]); 
     
     const animatedPathProps = useAnimatedProps(() => { 
         const angle = animatedProgress.value * 360; 
-        if (angle < 0.1) return { d: '' }; 
+        if (angle <= 0) return { d: '' }; 
         return { d: describeArc(size / 2, size / 2, CENTER_RADIUS, 0, angle) }; 
     }); 
     
@@ -49,11 +58,9 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
         const xCenter = (size / 2) + CENTER_RADIUS * Math.cos(angleRad);
         const yCenter = (size / 2) + CENTER_RADIUS * Math.sin(angleRad);
         
-        const HORIZONTAL_OFFSET = -155; 
-        
         return { 
             transform: [
-                { translateX: xCenter - INDICATOR_SIZE / 2 + HORIZONTAL_OFFSET }, 
+                { translateX: xCenter - INDICATOR_SIZE / 2 }, 
                 { translateY: yCenter - INDICATOR_SIZE / 2 }
             ], 
             opacity: 1 
@@ -68,7 +75,7 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
             </Svg>
             <Animated.View style={[ styles.progressIndicatorDot(theme), { width: INDICATOR_SIZE, height: INDICATOR_SIZE, borderRadius: INDICATOR_SIZE / 2, }, indicatorAnimatedStyle ]} />
             <View style={styles.summaryTextContainer}>
-                <Text style={styles.progressCircleText(theme)}>{currentStepCount.toLocaleString()}</Text>
+                <Text style={styles.progressCircleText(theme)}>{Math.round(currentStepCount || 0).toLocaleString()}</Text>
             </View>
         </View> 
     ); 
@@ -90,7 +97,8 @@ const StepsScreen = () => {
     const [isPromptVisible, setPromptVisible] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState('week');
     
-    // إعدادات Google Fit
+    const t = (key) => translations[language]?.[key] || translations['en'][key];
+
     const options = {
         scopes: [
             Scopes.FITNESS_ACTIVITY_READ,
@@ -98,19 +106,17 @@ const StepsScreen = () => {
         ],
     };
 
-    const t = (key) => translations[language]?.[key] || translations['en'][key];
-
-    // دالة الاتصال بجوجل فت
     const connectGoogleFit = async () => {
         try {
             const res = await GoogleFit.authorize(options);
             if (res.success) {
                 setIsGoogleFitConnected(true);
                 AsyncStorage.setItem('isGoogleFitConnected', 'true');
-                fetchGoogleFitData(); // جلب البيانات فوراً
+                startTracking();
             } else {
                 setIsGoogleFitConnected(false);
                 AsyncStorage.setItem('isGoogleFitConnected', 'false');
+                Alert.alert(t('errorTitle'), res.message);
             }
         } catch (error) {
             console.warn("Google Fit Auth Error:", error);
@@ -118,31 +124,35 @@ const StepsScreen = () => {
         }
     };
 
-    // جلب البيانات من جوجل فت
+    const startTracking = () => {
+        fetchGoogleFitData();
+        GoogleFit.observeSteps((result) => {
+            if (result && result.steps) {
+                fetchGoogleFitData();
+            }
+        });
+    }
+
     const fetchGoogleFitData = async () => {
-        setLoading(true);
         const now = new Date();
         const startOfDay = new Date();
         startOfDay.setHours(0,0,0,0);
         
-        // 1. جلب خطوات اليوم
         const todayOpts = {
             startDate: startOfDay.toISOString(),
             endDate: now.toISOString(),
-            bucketUnit: 'DAY',
+            bucketUnit: BucketUnit.DAY,
             bucketInterval: 1
         };
 
         try {
             const todayRes = await GoogleFit.getDailyStepCountSamples(todayOpts);
-            // Google Fit بيرجع مصادر كتير، بنحاول ناخد المصدر المدمج (Estimated)
-            // لو مفيش، بناخد أكبر قيمة فيهم عشان نتجنب التكرار
             if (todayRes && todayRes.length > 0) {
                 let maxSteps = 0;
                 todayRes.forEach(source => {
                     if (source.steps && source.steps.length > 0) {
-                        const val = source.steps[0].value;
-                        if (val > maxSteps) maxSteps = val;
+                         const val = source.steps[0].value;
+                         if (val > maxSteps) maxSteps = val;
                     }
                 });
                 setCurrentStepCount(maxSteps);
@@ -153,7 +163,6 @@ const StepsScreen = () => {
             console.log("Error fetching today steps:", e);
         }
 
-        // 2. جلب التاريخ (Chart)
         const daysToFetch = 30;
         const historyStart = new Date();
         historyStart.setDate(historyStart.getDate() - daysToFetch);
@@ -162,31 +171,25 @@ const StepsScreen = () => {
         const historyOpts = {
             startDate: historyStart.toISOString(),
             endDate: now.toISOString(),
-            bucketUnit: 'DAY',
+            bucketUnit: BucketUnit.DAY,
             bucketInterval: 1
         };
 
         try {
             const historyRes = await GoogleFit.getDailyStepCountSamples(historyOpts);
-            
-            // تجهيز البيانات للرسم البياني
-            // بنحتاج ندمج المصادر (Merge Sources) لنفس اليوم
             const stepsByDay = {};
-            
+
             if (historyRes) {
                 historyRes.forEach(source => {
                     source.steps.forEach(step => {
-                        // step.date بيجي string، بنحوله لـ YYYY-MM-DD
                         const dateStr = step.date.slice(0, 10); 
                         if (!stepsByDay[dateStr] || step.value > stepsByDay[dateStr]) {
-                             // بناخد أكبر قيمة لنفس اليوم (عشان نتفادى تكرار الساعات والتليفون)
                              stepsByDay[dateStr] = step.value;
                         }
                     });
                 });
             }
 
-            // تحويل الـ Map لـ Array مرتب
             const formattedData = [];
             for (let i = 0; i < daysToFetch; i++) {
                 const d = new Date();
@@ -200,7 +203,6 @@ const StepsScreen = () => {
                 });
             }
 
-            // معالجة العرض (أسبوعي / شهري)
             const localT = (key) => translations[language]?.[key] || translations['en'][key];
 
             if (selectedPeriod === 'week') {
@@ -239,27 +241,22 @@ const StepsScreen = () => {
                 if (isMounted) setTheme(savedTheme === 'true' ? darkTheme : lightTheme);
                 
                 const savedLang = await AsyncStorage.getItem('appLanguage');
-                const currentLang = savedLang || 'en';
-                if (isMounted) setLanguage(currentLang);
+                if (isMounted) setLanguage(savedLang || 'en');
                 
                 const savedGoal = await AsyncStorage.getItem('stepsGoal');
                 if (isMounted && savedGoal) setStepsGoal(parseInt(savedGoal, 10));
 
-                // التحقق من حالة الاتصال
                 const isConnected = await AsyncStorage.getItem('isGoogleFitConnected');
                 
                 if (isConnected === 'true') {
-                    // تحقق سريع هل لسه معانا الصلاحية
-                    const checkAuth = await GoogleFit.checkIsAuthorized();
-                    if (checkAuth) {
+                    const authorized = await GoogleFit.checkIsAuthorized();
+                    if (authorized) {
                          setIsGoogleFitConnected(true);
-                         fetchGoogleFitData();
+                         startTracking();
                     } else {
-                         // محاولة إعادة الاتصال الصامت
                          connectGoogleFit();
                     }
                 } else {
-                    // لم يتم الاتصال من قبل
                     setIsGoogleFitConnected(false);
                     setLoading(false);
                 }
@@ -267,13 +264,13 @@ const StepsScreen = () => {
             
             init();
 
-            // تحديث دوري (اختياري)
             const interval = setInterval(() => {
                 if (isGoogleFitConnected) fetchGoogleFitData();
-            }, 60000); // كل دقيقة
+            }, 10000);
 
             return () => {
                 isMounted = false;
+                GoogleFit.unsubscribeListeners();
                 clearInterval(interval);
             };
         }, [selectedPeriod, isGoogleFitConnected])
@@ -302,6 +299,8 @@ const StepsScreen = () => {
     const maxChartSteps = historicalData.length > 0 ? Math.max(...historicalData.map(d => d.steps), 1) : 1;
     const periodLabel = selectedPeriod === 'week' ? t('week') : t('month');
 
+    const progress = stepsGoal > 0 ? (currentStepCount || 0) / stepsGoal : 0;
+
     const renderTodaySummary = () => {
         if (loading) {
             return <ActivityIndicator size="large" color={theme.primary} style={{ height: 180, marginBottom: 79 }} />;
@@ -320,19 +319,20 @@ const StepsScreen = () => {
         }
         return (
             <>
-                <AnimatedStepsCircle size={180} strokeWidth={15} currentStepCount={currentStepCount} progress={stepsGoal > 0 ? currentStepCount / stepsGoal : 0} theme={theme} />
+                <AnimatedStepsCircle size={180} strokeWidth={15} currentStepCount={currentStepCount} progress={progress} theme={theme} />
                 <View style={styles.subStatsContainer}>
+                    {/* ✅ تم تصحيح قفلة التاج هنا */}
                     <TouchableOpacity style={styles.subStatBox} onPress={() => setPromptVisible(true)}>
                         <MaterialCommunityIcons name="flag-checkered" size={24} color={theme.accentBlue} />
                         <Text style={styles.subStatText(theme)}>{stepsGoal.toLocaleString()}</Text>
                     </TouchableOpacity>
                     <View style={styles.subStatBox}>
                         <MaterialCommunityIcons name="fire" size={24} color={theme.accentOrange} />
-                        <Text style={styles.subStatText(theme)}>{calories}{t('calUnit')}</Text>
+                        <Text style={styles.subStatText(theme)}>{calories} {t('calUnit')}</Text>
                     </View>
                     <View style={styles.subStatBox}>
                         <MaterialCommunityIcons name="map-marker-distance" size={24} color={theme.primary} />
-                        <Text style={styles.subStatText(theme)}>{distance}{t('kmUnit')}</Text>
+                        <Text style={styles.subStatText(theme)}>{distance} {t('kmUnit')}</Text>
                     </View>
                 </View>
             </>
@@ -363,7 +363,7 @@ const StepsScreen = () => {
                                     <View style={[
                                         styles.bar(theme), 
                                         {
-                                            height: `${(item.steps / maxChartSteps) * 100}%`,
+                                            height: `${Math.max((item.steps / maxChartSteps) * 100, 5)}%`, 
                                             width: selectedPeriod === 'month' ? '60%' : '75%' 
                                         }
                                     ]} />
@@ -392,27 +392,27 @@ const styles = {
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
-    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'right', marginBottom: 4, marginTop: 15 }),
+    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', marginBottom: 4, marginTop: 15 }),
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
-    progressCircleText: (theme) => ({ fontSize: 42, fontWeight: 'bold', color: theme.textPrimary }),
+    progressCircleText: (theme) => ({ fontSize: 36, fontWeight: 'bold', color: theme.textPrimary }),
     summaryTextContainer: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
     subStatsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 },
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'rtl' }, 
+    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'ltr' }, 
     
-    barWrapper: { flex: 1, alignItems: 'center' }, 
+    barWrapper: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }, 
     barLabel: (theme) => ({ 
         marginTop: 5, 
-        fontSize: 11,
+        fontSize: 10,
         color: theme.textSecondary,
         textAlign: 'center'
     }),
 
-    bar: (theme) => ({ backgroundColor: theme.primary, borderRadius: 5 }),
-    statsRow: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background, direction: 'rtl' }),
+    bar: (theme) => ({ backgroundColor: theme.primary, borderRadius: 5, minHeight: 5 }),
+    statsRow: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background, direction: 'ltr' }),
     statLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary }),
     statValue: (theme) => ({ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }),
     modalOverlay: (theme) => ({ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center' }),
@@ -426,7 +426,7 @@ const styles = {
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'rtl' }),
+    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'ltr' }),
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),

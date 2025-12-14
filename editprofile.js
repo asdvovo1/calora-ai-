@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, Platform, Keyboard, ActivityIndicator } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, Alert, Platform, Keyboard, ActivityIndicator } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; 
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
@@ -22,7 +22,6 @@ const darkTheme = { background: '#121212', surface: '#1E1E1E', textDark: '#FFFFF
 
 const calculateCalories = (userData) => { if (!userData || !userData.birthDate || !userData.weight || !userData.height || !userData.gender || !userData.activityLevel || !userData.goal) return 2000; const { birthDate, gender, weight, height, activityLevel, goal } = userData; const age = new Date().getFullYear() - new Date(birthDate).getFullYear(); let bmr = (gender === 'male') ? (10 * weight + 6.25 * height - 5 * age + 5) : (10 * weight + 6.25 * height - 5 * age - 161); const activityMultipliers = { sedentary: 1.2, light: 1.375, active: 1.55, very_active: 1.725 }; const tdee = bmr * (activityMultipliers[activityLevel] || 1.2); let finalCalories; switch (goal) { case 'lose': finalCalories = tdee - 500; break; case 'gain': finalCalories = tdee + 500; break; default: finalCalories = tdee; break; } return Math.max(1200, Math.round(finalCalories)); };
 
-// ✅ تم التعديل: إزالة row-reverse واستخدام الاتجاه الطبيعي
 const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme }) => { 
   return ( 
     <View style={styles.inputContainer(theme)}>
@@ -35,7 +34,6 @@ const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'defa
   ); 
 });
 
-// ✅ تم التعديل: إزالة row-reverse
 const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme }) => { 
   return ( 
     <View style={styles.optionContainer}>
@@ -83,41 +81,45 @@ const EditProfileScreen = ({ appLanguage }) => {
           const savedLang = await AsyncStorage.getItem('appLanguage');
           const savedTheme = await AsyncStorage.getItem('isDarkMode');
           
-          if (savedLang) {
-            setActiveLanguage(savedLang);
-          } else if (appLanguage) {
-            setActiveLanguage(appLanguage);
-          }
+          if (savedLang) setActiveLanguage(savedLang);
+          else if (appLanguage) setActiveLanguage(appLanguage);
 
           setIsDarkMode(savedTheme === 'true');
 
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error("User not found for profile loading.");
-          setEmail(user.email || '');
-
-          const { data: supabaseProfile, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
-          if (error && error.code !== 'PGRST116') throw error;
-
-          if (supabaseProfile) {
-            setFirstName(supabaseProfile.first_name || '');
-            setLastName(supabaseProfile.last_name || '');
-            setProfileImage(supabaseProfile.profile_image_url || null);
-            setGender(supabaseProfile.gender || null);
-            setBirthDate(supabaseProfile.birth_date ? new Date(supabaseProfile.birth_date) : new Date());
-            setHeight(supabaseProfile.height ? String(supabaseProfile.height) : '');
-            setWeight(supabaseProfile.weight ? String(supabaseProfile.weight) : '');
-            setGoal(supabaseProfile.goal || null);
-            setTargetWeight(supabaseProfile.target_weight ? String(supabaseProfile.target_weight) : '');
-            setActivityLevel(supabaseProfile.activity_level || null);
-          } else {
-            const jsonValue = await AsyncStorage.getItem('userProfile');
-            if (jsonValue != null) {
-              const data = JSON.parse(jsonValue);
-              setFirstName(data.firstName || '');
-              setLastName(data.lastName || '');
-            }
+          // 1. Load Local Data First (Backup)
+          const jsonValue = await AsyncStorage.getItem('userProfile');
+          if (jsonValue != null) {
+            const data = JSON.parse(jsonValue);
+            setFirstName(data.firstName || '');
+            setLastName(data.lastName || '');
+            // ✅ مهم: تحميل الإيميل من التخزين المحلي كبداية
+            if (data.email) setEmail(data.email);
           }
+
+          // 2. Load Auth Data (Source of Truth for Email)
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+             // ✅ مهم: تحديث الإيميل من Supabase Auth (ده الأهم)
+             if (user.email) setEmail(user.email);
+
+             // 3. Load Profile Data from Supabase Table
+             const { data: supabaseProfile, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+             if (!error && supabaseProfile) {
+                setFirstName(supabaseProfile.first_name || firstName);
+                setLastName(supabaseProfile.last_name || lastName);
+                setProfileImage(supabaseProfile.profile_image_url || null);
+                setGender(supabaseProfile.gender || null);
+                if (supabaseProfile.birth_date) setBirthDate(new Date(supabaseProfile.birth_date));
+                setHeight(supabaseProfile.height ? String(supabaseProfile.height) : '');
+                setWeight(supabaseProfile.weight ? String(supabaseProfile.weight) : '');
+                setGoal(supabaseProfile.goal || null);
+                setTargetWeight(supabaseProfile.target_weight ? String(supabaseProfile.target_weight) : '');
+                setActivityLevel(supabaseProfile.activity_level || null);
+             }
+          }
+
         } catch(e) {
           console.error("Failed to load profile data", e);
         } finally {
@@ -140,9 +142,19 @@ const EditProfileScreen = ({ appLanguage }) => {
   const handleSave = useCallback(async () => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User not found for profile saving.");
+        if (!user) throw new Error("User not found");
 
-        const userDataForCalories = { firstName, lastName, email, profileImage, gender, birthDate: birthDate.toISOString(), height: parseFloat(height), weight: parseFloat(weight), goal, targetWeight: goal === 'maintain' ? null : parseFloat(targetWeight), activityLevel };
+        const userDataForCalories = { 
+            firstName, lastName, email, profileImage, gender, 
+            birthDate: birthDate.toISOString(), 
+            height: parseFloat(height), 
+            weight: parseFloat(weight), 
+            goal, 
+            targetWeight: goal === 'maintain' ? null : parseFloat(targetWeight), 
+            activityLevel 
+        };
+        
+        // حساب السعرات الجديد
         const newDailyGoal = calculateCalories(userDataForCalories);
 
         const profileDataForSupabase = {
@@ -156,7 +168,7 @@ const EditProfileScreen = ({ appLanguage }) => {
             goal: goal,
             target_weight: goal === 'maintain' ? null : parseFloat(targetWeight) || null,
             activity_level: activityLevel,
-            daily_goal: newDailyGoal,
+            daily_goal: newDailyGoal, // ✅ حفظ السعرات في الداتا بيز
             profile_image_url: profileImage,
             updated_at: new Date().toISOString()
         };
@@ -164,6 +176,7 @@ const EditProfileScreen = ({ appLanguage }) => {
         const { error } = await supabase.from('profiles').upsert(profileDataForSupabase);
         if (error) throw error;
         
+        // ✅ حفظ السعرات والبيانات محلياً عشان MainUI تقراها
         const finalProfileDataForLocal = { ...userDataForCalories, dailyGoal: newDailyGoal };
         await AsyncStorage.setItem('userProfile', JSON.stringify(finalProfileDataForLocal));
 
@@ -182,7 +195,6 @@ const EditProfileScreen = ({ appLanguage }) => {
     <SafeAreaView style={styles.container(theme)}>
       <View style={styles.header(theme)}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-            {/* ✅ في الوضع العربي التلقائي، الزر سيكون على اليمين، والسهم يشير لليمين */}
             <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.icon} />
         </TouchableOpacity>
         <Text style={styles.headerTitle(theme)}>{t('editProfile')}</Text>
@@ -208,6 +220,7 @@ const EditProfileScreen = ({ appLanguage }) => {
             <View style={[styles.inputContainer(theme), styles.disabledInputContainer(theme)]}>
                 <View style={{flex: 1}}>
                     <Text style={styles.inputLabel(theme)}>{t('mail')}</Text>
+                    {/* ✅ تم التأكد إن قيمة الإيميل مربوطة بالـ State */}
                     <TextInput style={[styles.textInput(theme), styles.disabledTextInput(theme)]} value={email} editable={false} />
                 </View>
                 <Ionicons name="lock-closed-outline" size={22} color={theme.textGray} />
@@ -242,11 +255,10 @@ const EditProfileScreen = ({ appLanguage }) => {
   );
 };
 
-// ✅ Styles مصححة (إزالة جميع الشروط الخاصة بالاتجاه)
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }), 
   header: (theme) => ({ 
-    flexDirection: 'row', // ✅ دائماً row، النظام يقلبها في العربي
+    flexDirection: 'row', 
     justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border 
   }), 
   headerButton: { padding: 5, width: 40, alignItems: 'center' },
@@ -255,32 +267,32 @@ const styles = {
   profileImageContainer: { position: 'relative' }, 
   profileImage: (theme) => ({ width: 100, height: 100, borderRadius: 50, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }), 
   cameraButton: (theme) => ({ 
-    position: 'absolute', bottom: 0, right: 0, // ✅ في العربي right تصبح left تلقائياً
+    position: 'absolute', bottom: 0, right: 0,
     backgroundColor: theme.surface, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.border, elevation: 3 
   }), 
   formSection: { paddingHorizontal: 20, marginBottom: 10, paddingTop: 10 }, 
   sectionTitle: (theme) => ({ 
     fontSize: 13, color: theme.textGray, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', 
-    textAlign: 'left' // ✅ في العربي تصبح يمين تلقائياً
+    textAlign: 'left' 
   }), 
   inputContainer: (theme) => ({ 
     backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 15, 
-    flexDirection: 'row', // ✅
+    flexDirection: 'row', 
     justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.border 
   }), 
   inputLabel: (theme) => ({ 
     fontSize: 12, color: theme.textGray, marginBottom: 4, 
-    textAlign: 'left' // ✅
+    textAlign: 'left' 
   }), 
   textInput: (theme) => ({ 
     fontSize: 16, fontWeight: '600', color: theme.textDark, padding: 0, 
-    textAlign: 'left' // ✅
+    textAlign: 'left' 
   }), 
   disabledInputContainer: (theme) => ({ backgroundColor: theme.disabledBackground }), 
   disabledTextInput: (theme) => ({ color: theme.textGray }), 
   optionContainer: { marginBottom: 15 }, 
   optionsWrapper: { 
-    flexDirection: 'row', // ✅
+    flexDirection: 'row', 
     gap: 8 
   }, 
   optionButton: (theme) => ({ flex: 1, paddingVertical: 12, paddingHorizontal: 5, borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface }),
