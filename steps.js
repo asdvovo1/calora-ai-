@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { 
     StyleSheet, View, Text, ScrollView, SafeAreaView, TouchableOpacity, 
-    ActivityIndicator, Alert, Modal, TextInput, StatusBar, Platform, AppState, Linking
+    ActivityIndicator, Alert, Modal, TextInput, StatusBar
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GoogleFit, { Scopes, BucketUnit } from 'react-native-google-fit'; 
@@ -19,8 +19,8 @@ const lightTheme = { primary: '#388E3C', primaryDark: '#1B5E20', background: '#E
 const darkTheme = { primary: '#66BB6A', primaryDark: '#81C784', background: '#121212',  card: '#1E1E1E',  textPrimary: '#FFFFFF',  textSecondary: '#B0B0B0', progressUnfilled: '#2C2C2C', inputBackground: '#2C2C2C',  overlay: 'rgba(0,0,0,0.7)', accentOrange: '#FF8A65', accentBlue: '#42A5F5', white: '#FFFFFF', statusBar: 'light-content', };
 
 const translations = { 
-    ar: { todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'Google Fit غير متصل', notAvailableMsg: 'يرجى ربط حساب Google Fit لعرض الخطوات.', connectBtn: 'ربط Google Fit', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى منح صلاحية النشاط البدني.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, 
-    en: { todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Google Fit Not Connected', notAvailableMsg: 'Please connect Google Fit to track steps.', connectBtn: 'Connect Google Fit', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable Physical Activity permission.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } 
+    ar: { screenTitle: 'تقرير الخطوات', todaySteps: 'خطوات اليوم', kmUnit: ' كم', calUnit: ' سعرة', last7Days: 'آخر 7 أيام', last30Days: 'آخر 30 يوم', periodSummary: 'ملخص {period}', week: 'الأسبوع', month: 'الشهر', noData: 'لا توجد بيانات لعرضها.', periodStats: 'إحصائيات {period}', avgSteps: 'متوسط الخطوات اليومي:', totalSteps: 'إجمالي خطوات {period}:', bestDay: 'أفضل يوم في {period}:', changeGoalTitle: 'تغيير الهدف اليومي', changeGoalMsg: 'أدخل هدفك الجديد للخطوات:', goalPlaceholder: 'مثال: 8000', cancel: 'إلغاء', save: 'حفظ', goalTooLargeTitle: 'الهدف كبير جدًا', goalTooLargeMsg: 'الرجاء إدخال رقم أقل من {maxSteps}.', errorTitle: 'خطأ', invalidNumber: 'الرجاء إدخال رقم صحيح.', notAvailableTitle: 'Google Fit غير متصل', notAvailableMsg: 'يرجى ربط حساب Google Fit لعرض الخطوات.', connectBtn: 'ربط Google Fit', permissionDeniedTitle: 'صلاحية مرفوضة', permissionDeniedMsg: 'يرجى منح صلاحية النشاط البدني.', weekdays: ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] }, 
+    en: { screenTitle: 'Steps Report', todaySteps: "Today's Steps", kmUnit: ' km', calUnit: ' kcal', last7Days: 'Last 7 Days', last30Days: 'Last 30 Days', periodSummary: '{period} Summary', week: 'Week', month: 'Month', noData: 'No data to display.', periodStats: '{period} Statistics', avgSteps: 'Daily Average:', totalSteps: 'Total {period} Steps:', bestDay: 'Best Day in {period}:', changeGoalTitle: 'Change Daily Goal', changeGoalMsg: 'Enter your new step goal:', goalPlaceholder: 'e.g., 8000', cancel: 'Cancel', save: 'Save', goalTooLargeTitle: 'Goal Too Large', goalTooLargeMsg: 'Please enter a number less than {maxSteps}.', errorTitle: 'Error', invalidNumber: 'Please enter a valid number.', notAvailableTitle: 'Google Fit Not Connected', notAvailableMsg: 'Please connect Google Fit to track steps.', connectBtn: 'Connect Google Fit', permissionDeniedTitle: 'Permission Denied', permissionDeniedMsg: 'Please enable Physical Activity permission.', weekdays: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] } 
 };
 
 // --- دوال مساعدة للرسم ---
@@ -82,10 +82,33 @@ const AnimatedStepsCircle = ({ progress, size, strokeWidth, currentStepCount, th
 };
 
 // --- نافذة تغيير الهدف ---
-const GoalPromptModal = ({ visible, onClose, onSubmit, theme, t }) => { const [inputValue, setInputValue] = useState(''); const handleSubmit = () => { onSubmit(inputValue); setInputValue(''); onClose(); }; return ( <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}><TouchableOpacity style={styles.modalOverlay(theme)} activeOpacity={1} onPress={onClose}><TouchableOpacity activeOpacity={1} style={styles.promptContainer(theme)}><Text style={styles.promptTitle(theme)}>{t('changeGoalTitle')}</Text><Text style={styles.promptMessage(theme)}>{t('changeGoalMsg')}</Text><TextInput style={styles.promptInput(theme)} keyboardType="numeric" placeholder={t('goalPlaceholder')} placeholderTextColor={theme.textSecondary} value={inputValue} onChangeText={setInputValue} autoFocus={true} /><View style={styles.promptButtons}><TouchableOpacity style={styles.promptButton} onPress={onClose}><Text style={styles.promptButtonText(theme)}>{t('cancel')}</Text></TouchableOpacity><TouchableOpacity style={[styles.promptButton, styles.promptButtonPrimary(theme)]} onPress={handleSubmit}><Text style={[styles.promptButtonText(theme), styles.promptButtonTextPrimary]}>{t('save')}</Text></TouchableOpacity></View></TouchableOpacity></TouchableOpacity></Modal> ); };
+const GoalPromptModal = ({ visible, onClose, onSubmit, theme, t }) => { 
+    const [inputValue, setInputValue] = useState(''); 
+    const handleSubmit = () => { onSubmit(inputValue); setInputValue(''); onClose(); }; 
+    return ( 
+        <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
+            <TouchableOpacity style={styles.modalOverlay(theme)} activeOpacity={1} onPress={onClose}>
+                <TouchableOpacity activeOpacity={1} style={styles.promptContainer(theme)}>
+                    <Text style={styles.promptTitle(theme)}>{t('changeGoalTitle')}</Text>
+                    <Text style={styles.promptMessage(theme)}>{t('changeGoalMsg')}</Text>
+                    <TextInput style={styles.promptInput(theme)} keyboardType="numeric" placeholder={t('goalPlaceholder')} placeholderTextColor={theme.textSecondary} value={inputValue} onChangeText={setInputValue} autoFocus={true} />
+                    <View style={styles.promptButtons}>
+                        <TouchableOpacity style={styles.promptButton} onPress={onClose}>
+                            <Text style={styles.promptButtonText(theme)}>{t('cancel')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.promptButton, styles.promptButtonPrimary(theme)]} onPress={handleSubmit}>
+                            <Text style={[styles.promptButtonText(theme), styles.promptButtonTextPrimary]}>{t('save')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </TouchableOpacity>
+        </Modal> 
+    ); 
+};
 
 
 const StepsScreen = () => {
+    const navigation = useNavigation(); // تعريف Navigation
     const [theme, setTheme] = useState(lightTheme);
     const [language, setLanguage] = useState('en');
     
@@ -97,7 +120,26 @@ const StepsScreen = () => {
     const [isPromptVisible, setPromptVisible] = useState(false);
     const [selectedPeriod, setSelectedPeriod] = useState('week');
     
+    const isRTL = language === 'en';
     const t = (key) => translations[language]?.[key] || translations['en'][key];
+
+    // --- كود نقل السهم لليمين ---
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            // تم إلغاء الجهة اليسرى
+            headerLeft: () => null,
+            // تم نقل السهم للجهة اليمنى مع تعديل الـ margin
+            headerRight: () => (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 15 }}>
+                    <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textPrimary} />
+                </TouchableOpacity>
+            ),
+            title: t('screenTitle'),
+            headerTitleAlign: 'center', // توسيط العنوان
+            headerStyle: { backgroundColor: theme.card, shadowColor: 'transparent', elevation: 0 },
+            headerTintColor: theme.textPrimary,
+        });
+    }, [navigation, theme, language]);
 
     const options = {
         scopes: [
@@ -320,8 +362,7 @@ const StepsScreen = () => {
         return (
             <>
                 <AnimatedStepsCircle size={180} strokeWidth={15} currentStepCount={currentStepCount} progress={progress} theme={theme} />
-                <View style={styles.subStatsContainer}>
-                    {/* ✅ تم تصحيح قفلة التاج هنا */}
+                <View style={styles.subStatsContainer(isRTL)}>
                     <TouchableOpacity style={styles.subStatBox} onPress={() => setPromptVisible(true)}>
                         <MaterialCommunityIcons name="flag-checkered" size={24} color={theme.accentBlue} />
                         <Text style={styles.subStatText(theme)}>{stepsGoal.toLocaleString()}</Text>
@@ -351,13 +392,13 @@ const StepsScreen = () => {
                 {isGoogleFitConnected && (
                 <>
                     <View style={styles.card(theme)}>
-                        <View style={styles.periodToggleContainer(theme)}>
+                        <View style={styles.periodToggleContainer(theme, isRTL)}>
                             <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'month' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('month')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'month' && styles.activePeriodText(theme)]}>{t('last30Days')}</Text></TouchableOpacity>
                             <TouchableOpacity style={[styles.periodToggleButton, selectedPeriod === 'week' && styles.activePeriodButton(theme)]} onPress={() => setSelectedPeriod('week')}><Text style={[styles.periodButtonText(theme), selectedPeriod === 'week' && styles.activePeriodText(theme)]}>{t('last7Days')}</Text></TouchableOpacity>
                         </View>
-                        <Text style={styles.sectionTitle(theme)}>{t('periodSummary').replace('{period}', periodLabel)}</Text>
+                        <Text style={styles.sectionTitle(theme, isRTL)}>{t('periodSummary').replace('{period}', periodLabel)}</Text>
                         {loading ? <ActivityIndicator color={theme.primary}/> : historicalData.length > 0 ? 
-                        <View style={styles.chartContainer}>
+                        <View style={styles.chartContainer(isRTL)}>
                             {historicalData.map((item, index) => ( 
                                 <View key={index} style={styles.barWrapper}>
                                     <View style={[
@@ -374,11 +415,11 @@ const StepsScreen = () => {
                         : <Text style={styles.emptyLogText(theme)}>{t('noData')}</Text>}
                     </View>
                     <View style={styles.card(theme)}>
-                        <Text style={styles.sectionTitle(theme)}>{t('periodStats').replace('{period}', periodLabel)}</Text>
+                        <Text style={styles.sectionTitle(theme, isRTL)}>{t('periodStats').replace('{period}', periodLabel)}</Text>
                         {loading ? <ActivityIndicator color={theme.primary}/> : <>
-                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('avgSteps')}</Text><Text style={styles.statValue(theme)}>{averagePeriodSteps.toLocaleString()}</Text></View>
-                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{t('totalSteps').replace('{period}', periodLabel)}</Text><Text style={styles.statValue(theme)}>{totalPeriodSteps.toLocaleString()}</Text></View>
-                            <View style={styles.statsRow(theme)}><Text style={styles.statLabel(theme)}>{selectedPeriod === 'week' ? t('bestDay').replace('{period}', periodLabel) : `${t('week')} الأفضل:`}</Text><Text style={styles.statValue(theme)}>{bestDayInPeriod.toLocaleString()}</Text></View>
+                            <View style={styles.statsRow(theme, isRTL)}><Text style={styles.statLabel(theme)}>{t('avgSteps')}</Text><Text style={styles.statValue(theme)}>{averagePeriodSteps.toLocaleString()}</Text></View>
+                            <View style={styles.statsRow(theme, isRTL)}><Text style={styles.statLabel(theme)}>{t('totalSteps').replace('{period}', periodLabel)}</Text><Text style={styles.statValue(theme)}>{totalPeriodSteps.toLocaleString()}</Text></View>
+                            <View style={styles.statsRow(theme, isRTL)}><Text style={styles.statLabel(theme)}>{selectedPeriod === 'week' ? t('bestDay').replace('{period}', periodLabel) : `${t('week')} الأفضل:`}</Text><Text style={styles.statValue(theme)}>{bestDayInPeriod.toLocaleString()}</Text></View>
                         </>}
                     </View>
                 </>
@@ -392,17 +433,34 @@ const styles = {
     modalPage: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     modalPageContent: { padding: 20 },
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 20, padding: 20, marginBottom: 15, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 }),
-    sectionTitle: (theme) => ({ fontSize: 22, fontWeight: 'bold', color: theme.textPrimary, textAlign: 'left', marginBottom: 4, marginTop: 15 }),
+    sectionTitle: (theme, isRTL) => ({ 
+        fontSize: 22, 
+        fontWeight: 'bold', 
+        color: theme.textPrimary, 
+        textAlign: isRTL ? 'right' : 'left', 
+        marginBottom: 4, 
+        marginTop: 15 
+    }),
     emptyLogText: (theme) => ({ textAlign: 'center', marginTop: 20, marginBottom: 10, fontSize: 16, color: theme.textSecondary }),
     todaySummaryCard: { alignItems: 'center', paddingVertical: 30, minHeight: 330 },
     todaySummaryLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginBottom: 20 }),
     progressCircleText: (theme) => ({ fontSize: 36, fontWeight: 'bold', color: theme.textPrimary }),
     summaryTextContainer: { position: 'absolute', justifyContent: 'center', alignItems: 'center' },
-    subStatsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 25 },
+    subStatsContainer: (isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        justifyContent: 'space-around', 
+        width: '100%', 
+        marginTop: 25 
+    }),
     subStatBox: { alignItems: 'center', padding: 10 },
     subStatText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 5 }),
-    chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 150, marginTop: 20, direction: 'ltr' }, 
-    
+    chartContainer: (isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        justifyContent: 'space-around', 
+        alignItems: 'flex-end', 
+        height: 150, 
+        marginTop: 20 
+    }), 
     barWrapper: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }, 
     barLabel: (theme) => ({ 
         marginTop: 5, 
@@ -410,9 +468,14 @@ const styles = {
         color: theme.textSecondary,
         textAlign: 'center'
     }),
-
     bar: (theme) => ({ backgroundColor: theme.primary, borderRadius: 5, minHeight: 5 }),
-    statsRow: (theme) => ({ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.background, direction: 'ltr' }),
+    statsRow: (theme, isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        justifyContent: 'space-between', 
+        paddingVertical: 10, 
+        borderBottomWidth: 1, 
+        borderBottomColor: theme.background 
+    }),
     statLabel: (theme) => ({ fontSize: 16, color: theme.textSecondary }),
     statValue: (theme) => ({ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary }),
     modalOverlay: (theme) => ({ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center' }),
@@ -426,7 +489,13 @@ const styles = {
     promptButtonText: (theme) => ({ fontSize: 16, color: theme.primary, fontWeight: '600' }),
     promptButtonTextPrimary: { color: 'white' },
     progressIndicatorDot: (theme) => ({ position: 'absolute', top: 0, left: 0, backgroundColor: theme.primaryDark, borderWidth: 3, borderColor: theme.card, elevation: 5 }),
-    periodToggleContainer: (theme) => ({ flexDirection: 'row', backgroundColor: theme.background, borderRadius: 10, padding: 4, marginBottom: 10, direction: 'ltr' }),
+    periodToggleContainer: (theme, isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        backgroundColor: theme.background, 
+        borderRadius: 10, 
+        padding: 4, 
+        marginBottom: 10 
+    }),
     periodToggleButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
     activePeriodButton: (theme) => ({ backgroundColor: theme.card, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }),
     periodButtonText: (theme) => ({ fontSize: 16, fontWeight: '600', color: theme.textSecondary }),
