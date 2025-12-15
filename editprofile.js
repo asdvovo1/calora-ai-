@@ -8,6 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabaseclient';
 
+// تأكد أن المسار هذا صحيح وموجود فعلاً
 const defaultProfileImage = require('./assets/profile.png'); 
 
 const translations = {
@@ -63,7 +64,11 @@ const EditProfileScreen = ({ appLanguage }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  
+  // States للصورة
   const [profileImage, setProfileImage] = useState(null);
+  const [imageError, setImageError] = useState(false); // <--- تم إضافة هذا المتغير
+
   const [gender, setGender] = useState(null);
   const [birthDate, setBirthDate] = useState(new Date());
   const [height, setHeight] = useState('');
@@ -77,7 +82,6 @@ const EditProfileScreen = ({ appLanguage }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   const [activeLanguage, setActiveLanguage] = useState(appLanguage || 'en');
-  // isRTL here means if the language is Arabic
   const isRTL = activeLanguage === 'ar';
 
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -112,7 +116,11 @@ const EditProfileScreen = ({ appLanguage }) => {
              if (!error && supabaseProfile) {
                 setFirstName(supabaseProfile.first_name || firstName);
                 setLastName(supabaseProfile.last_name || lastName);
+                
+                // تحميل الصورة ومسح حالة الخطأ
                 setProfileImage(supabaseProfile.profile_image_url || null);
+                setImageError(false); 
+
                 setGender(supabaseProfile.gender || null);
                 if (supabaseProfile.birth_date) setBirthDate(new Date(supabaseProfile.birth_date));
                 setHeight(supabaseProfile.height ? String(supabaseProfile.height) : '');
@@ -138,7 +146,6 @@ const EditProfileScreen = ({ appLanguage }) => {
     return () => { keyboardDidHideListener.remove(); keyboardDidShowListener.remove(); };
   }, []);
 
-  // ✅ دالة تنسيق التاريخ الجديدة (DD/MM/YYYY)
   const formatDate = (date) => {
     if (!date) return '';
     const d = new Date(date);
@@ -148,7 +155,24 @@ const EditProfileScreen = ({ appLanguage }) => {
     return `${day}/${month}/${year}`;
   };
   
-  const handleImagePicker = useCallback(() => { Alert.alert(t('profilePic'), t('chooseNewPic'), [ { text: t('takePhoto'), onPress: () => launchCamera({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('chooseFromGallery'), onPress: () => launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('cancel'), style: 'cancel' } ]); }, [t]);
+  const handleImagePicker = useCallback(() => { 
+    Alert.alert(t('profilePic'), t('chooseNewPic'), [ 
+      { text: t('takePhoto'), onPress: () => launchCamera({ mediaType: 'photo', quality: 0.5 }, (r) => { 
+        if (!r.didCancel && r.assets) {
+            setProfileImage(r.assets[0].uri); 
+            setImageError(false); // <--- إعادة تعيين الخطأ عند التقاط صورة جديدة
+        }
+      }) }, 
+      { text: t('chooseFromGallery'), onPress: () => launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (r) => { 
+        if (!r.didCancel && r.assets) {
+            setProfileImage(r.assets[0].uri); 
+            setImageError(false); // <--- إعادة تعيين الخطأ عند اختيار صورة جديدة
+        }
+      }) }, 
+      { text: t('cancel'), style: 'cancel' } 
+    ]); 
+  }, [t]);
+
   const onDateChange = useCallback((event, selectedDate) => { setShowDatePicker(Platform.OS === 'ios'); if (selectedDate) { setBirthDate(selectedDate); } }, []);
 
   const handleSave = useCallback(async () => {
@@ -187,10 +211,18 @@ const EditProfileScreen = ({ appLanguage }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: keyboardPadding }} keyboardShouldPersistTaps="handled">
         <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
+                {/* --- تعديل هام هنا لعرض الصورة بشكل صحيح --- */}
                 <Image 
-                    source={profileImage ? { uri: profileImage } : defaultProfileImage} 
+                    source={
+                        (profileImage && !imageError) 
+                        ? { uri: profileImage } 
+                        : defaultProfileImage
+                    }
                     style={styles.profileImage(theme)}
+                    onError={() => setImageError(true)} // إذا فشل التحميل، اعتبر الصورة غير موجودة
                 />
+                {/* -------------------------------------- */}
+                
                 <TouchableOpacity style={styles.cameraButton(theme)} onPress={handleImagePicker}>
                     <Ionicons name="camera" size={18} color={theme.textDark} />
                 </TouchableOpacity>
@@ -220,17 +252,14 @@ const EditProfileScreen = ({ appLanguage }) => {
             <Text style={styles.sectionTitle(theme, isRTL)}>{t('physicalMetrics')}</Text>
             <OptionSelector label={t('gender')} options={[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }]} selectedValue={gender} onSelect={setGender} theme={theme} isRTL={isRTL} />
             
-            {/* ✅ تم تعديل هذا الجزء ليظهر التاريخ بشكل ثابت */}
-            {/* ✅ جزء التاريخ المعدل ليظهر الرقم على اليسار مثل البقية */}
             <TouchableOpacity style={styles.inputContainer(theme, isRTL)} onPress={() => setShowDatePicker(true)}>
                 <View style={{flex: 1}}>
                     <Text style={styles.inputLabel(theme, isRTL)}>{t('dob')}</Text>
                     <Text 
                         style={[
                             styles.textInput(theme, isRTL), 
-                            { textAlign: isRTL ? 'left' : 'right' } // إجبار النص يكون يسار في الإنجليزي
+                            { textAlign: isRTL ? 'left' : 'right' } 
                         ]} 
-                        // تم تعديل هذا السطر ليكون LTR في الإنجليزي
                         writingDirection={isRTL ? 'rtl' : 'ltr'}
                     >
                         {formatDate(birthDate)}

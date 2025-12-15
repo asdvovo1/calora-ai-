@@ -63,7 +63,9 @@ const AboutScreen = ({ route }) => {
     const navigation = useNavigation();
     const t = (key) => translations[language]?.[key] || key;
     
-    const isRTL = language === 'ar';
+    // ✅ (عكس المنطق الطبيعي بناءً على طلبك)
+    // الإنجليزي 'en' سيصبح RTL، والعربي 'ar' سيصبح LTR
+    const isCustomRTL = language === 'en'; 
     
     useFocusEffect(
         useCallback(() => {
@@ -95,10 +97,11 @@ const AboutScreen = ({ route }) => {
         <SafeAreaView style={styles.rootContainer(theme)}>
             <StatusBar barStyle={theme.statusBar} backgroundColor={theme.background} />
             
-            <View style={styles.customHeader(theme)}>
+            {/* تم تمرير isCustomRTL للستايل */}
+            <View style={styles.customHeader(theme, isCustomRTL)}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    {/* ✅ السهم يتغير شكله، لكن مكانه سيتحدد تلقائياً بالـ styles */}
-                    <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.textPrimary} />
+                    {/* إذا كان الوضع RTL (إنجليزي هنا)، السهم يمين، والعكس */}
+                    <Icon name={isCustomRTL ? "arrow-left" : "arrow-right"} size={28} color={theme.textPrimary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle(theme)}>{t('headerTitle')}</Text>
                 <View style={{ width: 40 }} /> 
@@ -111,29 +114,32 @@ const AboutScreen = ({ route }) => {
                 </View>
 
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme)}>{t('aboutUsTitle')}</Text>
-                    <Text style={styles.sectionText(theme)}>{t('aboutUsText')}</Text>
+                    <Text style={styles.sectionTitle(theme, isCustomRTL)}>{t('aboutUsTitle')}</Text>
+                    <Text style={styles.sectionText(theme, isCustomRTL)}>{t('aboutUsText')}</Text>
                 </View>
+
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme)}>{t('featuresTitle')}</Text>
+                    <Text style={styles.sectionTitle(theme, isCustomRTL)}>{t('featuresTitle')}</Text>
                     {features.map((feature, index) => (
-                        <View key={index} style={styles.featureItem}>
-                            <Icon name={feature.icon} size={35} color={theme.primary} style={styles.featureIcon} />
-                            <View style={styles.featureTextContainer}>
-                                <Text style={styles.featureTitle(theme)}>{feature.title}</Text>
-                                <Text style={styles.featureDescription(theme)}>{feature.description}</Text>
+                        <View key={index} style={styles.featureItem(isCustomRTL)}>
+                            <Icon name={feature.icon} size={35} color={theme.primary} style={styles.featureIcon(isCustomRTL)} />
+                            <View style={styles.featureTextContainer(isCustomRTL)}>
+                                <Text style={styles.featureTitle(theme, isCustomRTL)}>{feature.title}</Text>
+                                <Text style={styles.featureDescription(theme, isCustomRTL)}>{feature.description}</Text>
                             </View>
                         </View>
                     ))}
                 </View>
+
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme)}>{t('visionTitle')}</Text>
-                    <Text style={styles.sectionText(theme)}>{t('visionText')}</Text>
+                    <Text style={styles.sectionTitle(theme, isCustomRTL)}>{t('visionTitle')}</Text>
+                    <Text style={styles.sectionText(theme, isCustomRTL)}>{t('visionText')}</Text>
                 </View>
+
                 <View style={styles.card(theme)}>
-                    <Text style={styles.sectionTitle(theme)}>{t('contactTitle')}</Text>
-                    <Text style={styles.sectionText(theme)}>{t('contactIntro')}</Text>
-                    <TouchableOpacity style={styles.contactItem(theme)} onPress={handleEmailPress}>
+                    <Text style={styles.sectionTitle(theme, isCustomRTL)}>{t('contactTitle')}</Text>
+                    <Text style={styles.sectionText(theme, isCustomRTL)}>{t('contactIntro')}</Text>
+                    <TouchableOpacity style={styles.contactItem(theme, isCustomRTL)} onPress={handleEmailPress}>
                         <Icon name="email-outline" size={24} color={theme.primary} />
                         <Text style={styles.contactText(theme)}>{contactEmail}</Text>
                     </TouchableOpacity>
@@ -144,12 +150,15 @@ const AboutScreen = ({ route }) => {
     );
 };
 
-// ✅ Styles مصححة (إزالة row-reverse و flex-end اليدوي)
+// ✅ Styles معدلة لتعكس الاتجاه حسب الطلب (isCustomRTL)
+// إذا isRTL = true (إنجليزي): نستخدم row-reverse و text-align: right
+// إذا isRTL = false (عربي): نستخدم row و text-align: left
 const styles = {
     rootContainer: (theme) => ({ flex: 1, backgroundColor: theme.background }),
     container: { paddingHorizontal: 20, paddingBottom: 40 },
-    customHeader: (theme) => ({
-        flexDirection: 'row', // ✅
+    
+    customHeader: (theme, isRTL) => ({
+        flexDirection: isRTL ? 'row-reverse' : 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 15,
@@ -164,39 +173,42 @@ const styles = {
     slogan: (theme) => ({ fontSize: 16, color: theme.textSecondary, marginTop: 4 }),
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 12, padding: 20, marginBottom: 20, elevation: 3 }),
     
-    sectionTitle: (theme) => ({ 
+    sectionTitle: (theme, isRTL) => ({ 
         fontSize: 22, fontWeight: 'bold', color: theme.primary, marginBottom: 15, 
-        textAlign: 'left' // ✅
+        textAlign: isRTL ? 'right' : 'left' 
     }),
-    sectionText: (theme) => ({ 
+    sectionText: (theme, isRTL) => ({ 
         fontSize: 16, lineHeight: 24, color: theme.textSecondary, 
-        textAlign: 'left' // ✅
+        textAlign: isRTL ? 'right' : 'left' 
     }),
     
-    featureItem: { 
-        flexDirection: 'row', // ✅
+    featureItem: (isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row', 
         alignItems: 'flex-start', marginBottom: 20 
-    },
-    featureIcon: { 
-        marginRight: 15 // ✅ تصبح marginLeft في العربي تلقائياً
-    },
-    featureTextContainer: { 
-        flex: 1, 
-        alignItems: 'flex-start' // ✅
-    },
-    featureTitle: (theme) => ({ 
-        fontSize: 17, fontWeight: 'bold', color: theme.textPrimary, 
-        textAlign: 'left' // ✅
     }),
-    featureDescription: (theme) => ({ 
+    featureIcon: (isRTL) => ({ 
+        // في وضع الـ row-reverse (إنجليزي)، الأيقونة يمين، الهامش يسارها
+        marginLeft: isRTL ? 15 : 0,
+        // في وضع الـ row (عربي)، الأيقونة يسار، الهامش يمينها
+        marginRight: isRTL ? 0 : 15 
+    }),
+    featureTextContainer: (isRTL) => ({ 
+        flex: 1, 
+        alignItems: isRTL ? 'flex-end' : 'flex-start' 
+    }),
+    featureTitle: (theme, isRTL) => ({ 
+        fontSize: 17, fontWeight: 'bold', color: theme.textPrimary, 
+        textAlign: isRTL ? 'right' : 'left' 
+    }),
+    featureDescription: (theme, isRTL) => ({ 
         fontSize: 14, color: theme.textSecondary, marginTop: 4, lineHeight: 20, 
-        textAlign: 'left' // ✅
+        textAlign: isRTL ? 'right' : 'left' 
     }),
     
-    contactItem: (theme) => ({ 
-        flexDirection: 'row', // ✅
+    contactItem: (theme, isRTL) => ({ 
+        flexDirection: isRTL ? 'row-reverse' : 'row',
         alignItems: 'center', marginTop: 20, backgroundColor: theme.contactBg, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, 
-        alignSelf: 'flex-start' // ✅
+        alignSelf: isRTL ? 'flex-end' : 'flex-start'
     }),
     contactText: (theme) => ({ fontSize: 16, color: theme.contactText, fontWeight: '500', marginHorizontal: 10 }),
     footerText: (theme) => ({ textAlign: 'center', color: theme.textSecondary, marginTop: 20, fontSize: 12 }),
