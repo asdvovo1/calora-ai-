@@ -8,6 +8,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from './supabaseclient';
 
+const defaultProfileImage = require('./assets/profile.png'); 
+
 const translations = {
   en: { 
     editProfile: 'EDIT PROFILE', publicInfo: 'PUBLIC INFORMATION', firstName: 'First name', lastName: 'Last name', mail: 'Mail', physicalMetrics: 'PHYSICAL METRICS', gender: 'Gender', male: 'Male', female: 'Female', dob: 'Date of Birth', height: 'Height (cm)', currentWeight: 'Current Weight (kg)', goals: 'GOALS', mainGoal: 'Main Goal', lose: 'Lose', maintain: 'Maintain', gain: 'Gain', targetWeight: 'Target Weight (kg)', activityLevel: 'Activity Level', sedentary: 'Sedentary', light: 'Light', active: 'Active', very_active: 'Very Active', profilePic: 'Profile Picture', chooseNewPic: 'Choose your new picture', takePhoto: 'Take Photo', chooseFromGallery: 'Choose from Gallery', cancel: 'Cancel', success: 'Success', saveSuccess: 'Changes saved successfully!', error: 'Error', saveError: 'An error occurred while saving data.', 
@@ -22,23 +24,30 @@ const darkTheme = { background: '#121212', surface: '#1E1E1E', textDark: '#FFFFF
 
 const calculateCalories = (userData) => { if (!userData || !userData.birthDate || !userData.weight || !userData.height || !userData.gender || !userData.activityLevel || !userData.goal) return 2000; const { birthDate, gender, weight, height, activityLevel, goal } = userData; const age = new Date().getFullYear() - new Date(birthDate).getFullYear(); let bmr = (gender === 'male') ? (10 * weight + 6.25 * height - 5 * age + 5) : (10 * weight + 6.25 * height - 5 * age - 161); const activityMultipliers = { sedentary: 1.2, light: 1.375, active: 1.55, very_active: 1.725 }; const tdee = bmr * (activityMultipliers[activityLevel] || 1.2); let finalCalories; switch (goal) { case 'lose': finalCalories = tdee - 500; break; case 'gain': finalCalories = tdee + 500; break; default: finalCalories = tdee; break; } return Math.max(1200, Math.round(finalCalories)); };
 
-const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme }) => { 
+const InfoInput = React.memo(({ label, value, onChangeText, keyboardType = 'default', theme, isRTL }) => { 
   return ( 
-    <View style={styles.inputContainer(theme)}>
+    <View style={styles.inputContainer(theme, isRTL)}>
         <View style={{flex: 1}}>
-            <Text style={styles.inputLabel(theme)}>{label}</Text>
-            <TextInput style={styles.textInput(theme)} value={value} onChangeText={onChangeText} keyboardType={keyboardType} placeholderTextColor={theme.textGray} />
+            <Text style={styles.inputLabel(theme, isRTL)}>{label}</Text>
+            <TextInput 
+                style={styles.textInput(theme, isRTL)} 
+                value={value} 
+                onChangeText={onChangeText} 
+                keyboardType={keyboardType} 
+                placeholderTextColor={theme.textGray}
+                writingDirection={isRTL ? 'ltr' : 'rtl'}
+            />
         </View>
         {value && String(value).trim().length > 0 && <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />}
     </View> 
   ); 
 });
 
-const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme }) => { 
+const OptionSelector = React.memo(({ label, options, selectedValue, onSelect, theme, isRTL }) => { 
   return ( 
     <View style={styles.optionContainer}>
-        <Text style={styles.inputLabel(theme)}>{label}</Text>
-        <View style={styles.optionsWrapper}>
+        <Text style={styles.inputLabel(theme, isRTL)}>{label}</Text>
+        <View style={styles.optionsWrapper(isRTL)}>
             {options.map((option) => ( 
                 <TouchableOpacity key={option.value} style={[styles.optionButton(theme), selectedValue === option.value && styles.optionButtonSelected(theme)]} onPress={() => onSelect(option.value)}>
                     <Text style={[styles.optionText(theme), selectedValue === option.value && styles.optionTextSelected]} numberOfLines={1} adjustsFontSizeToFit>{option.label}</Text>
@@ -68,6 +77,7 @@ const EditProfileScreen = ({ appLanguage }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   const [activeLanguage, setActiveLanguage] = useState(appLanguage || 'en');
+  // isRTL here means if the language is Arabic
   const isRTL = activeLanguage === 'ar';
 
   const theme = isDarkMode ? darkTheme : lightTheme;
@@ -86,26 +96,19 @@ const EditProfileScreen = ({ appLanguage }) => {
 
           setIsDarkMode(savedTheme === 'true');
 
-          // 1. Load Local Data First (Backup)
           const jsonValue = await AsyncStorage.getItem('userProfile');
           if (jsonValue != null) {
             const data = JSON.parse(jsonValue);
             setFirstName(data.firstName || '');
             setLastName(data.lastName || '');
-            // ✅ مهم: تحميل الإيميل من التخزين المحلي كبداية
             if (data.email) setEmail(data.email);
           }
 
-          // 2. Load Auth Data (Source of Truth for Email)
           const { data: { user } } = await supabase.auth.getUser();
           
           if (user) {
-             // ✅ مهم: تحديث الإيميل من Supabase Auth (ده الأهم)
              if (user.email) setEmail(user.email);
-
-             // 3. Load Profile Data from Supabase Table
              const { data: supabaseProfile, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
              if (!error && supabaseProfile) {
                 setFirstName(supabaseProfile.first_name || firstName);
                 setLastName(supabaseProfile.last_name || lastName);
@@ -119,7 +122,6 @@ const EditProfileScreen = ({ appLanguage }) => {
                 setActivityLevel(supabaseProfile.activity_level || null);
              }
           }
-
         } catch(e) {
           console.error("Failed to load profile data", e);
         } finally {
@@ -135,6 +137,16 @@ const EditProfileScreen = ({ appLanguage }) => {
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => { setKeyboardPadding(50); });
     return () => { keyboardDidHideListener.remove(); keyboardDidShowListener.remove(); };
   }, []);
+
+  // ✅ دالة تنسيق التاريخ الجديدة (DD/MM/YYYY)
+  const formatDate = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
   
   const handleImagePicker = useCallback(() => { Alert.alert(t('profilePic'), t('chooseNewPic'), [ { text: t('takePhoto'), onPress: () => launchCamera({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('chooseFromGallery'), onPress: () => launchImageLibrary({ mediaType: 'photo', quality: 0.5 }, (r) => { if (!r.didCancel && r.assets) setProfileImage(r.assets[0].uri); }) }, { text: t('cancel'), style: 'cancel' } ]); }, [t]);
   const onDateChange = useCallback((event, selectedDate) => { setShowDatePicker(Platform.OS === 'ios'); if (selectedDate) { setBirthDate(selectedDate); } }, []);
@@ -143,46 +155,15 @@ const EditProfileScreen = ({ appLanguage }) => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
-
-        const userDataForCalories = { 
-            firstName, lastName, email, profileImage, gender, 
-            birthDate: birthDate.toISOString(), 
-            height: parseFloat(height), 
-            weight: parseFloat(weight), 
-            goal, 
-            targetWeight: goal === 'maintain' ? null : parseFloat(targetWeight), 
-            activityLevel 
-        };
-        
-        // حساب السعرات الجديد
+        const userDataForCalories = { firstName, lastName, email, profileImage, gender, birthDate: birthDate.toISOString(), height: parseFloat(height), weight: parseFloat(weight), goal, targetWeight: goal === 'maintain' ? null : parseFloat(targetWeight), activityLevel };
         const newDailyGoal = calculateCalories(userDataForCalories);
-
-        const profileDataForSupabase = {
-            id: user.id,
-            first_name: firstName,
-            last_name: lastName,
-            gender: gender,
-            birth_date: birthDate.toISOString().split('T')[0],
-            height: parseFloat(height) || null,
-            weight: parseFloat(weight) || null,
-            goal: goal,
-            target_weight: goal === 'maintain' ? null : parseFloat(targetWeight) || null,
-            activity_level: activityLevel,
-            daily_goal: newDailyGoal, // ✅ حفظ السعرات في الداتا بيز
-            profile_image_url: profileImage,
-            updated_at: new Date().toISOString()
-        };
-
+        const profileDataForSupabase = { id: user.id, first_name: firstName, last_name: lastName, gender: gender, birth_date: birthDate.toISOString().split('T')[0], height: parseFloat(height) || null, weight: parseFloat(weight) || null, goal: goal, target_weight: goal === 'maintain' ? null : parseFloat(targetWeight) || null, activity_level: activityLevel, daily_goal: newDailyGoal, profile_image_url: profileImage, updated_at: new Date().toISOString() };
         const { error } = await supabase.from('profiles').upsert(profileDataForSupabase);
         if (error) throw error;
-        
-        // ✅ حفظ السعرات والبيانات محلياً عشان MainUI تقراها
         const finalProfileDataForLocal = { ...userDataForCalories, dailyGoal: newDailyGoal };
         await AsyncStorage.setItem('userProfile', JSON.stringify(finalProfileDataForLocal));
-
         Alert.alert(t('success'), t('saveSuccess'));
         navigation.goBack();
-
     } catch (error) {
         console.error("Error saving profile:", error);
         Alert.alert(t('error'), t('saveError'));
@@ -193,7 +174,7 @@ const EditProfileScreen = ({ appLanguage }) => {
 
   return (
     <SafeAreaView style={styles.container(theme)}>
-      <View style={styles.header(theme)}>
+      <View style={styles.header(theme, isRTL)}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
             <Icon name={isRTL ? "arrow-right" : "arrow-left"} size={28} color={theme.icon} />
         </TouchableOpacity>
@@ -206,7 +187,10 @@ const EditProfileScreen = ({ appLanguage }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: keyboardPadding }} keyboardShouldPersistTaps="handled">
         <View style={styles.profileSection}>
             <View style={styles.profileImageContainer}>
-                <Image source={profileImage ? { uri: profileImage } : require('./assets/profile.png')} style={styles.profileImage(theme)}/>
+                <Image 
+                    source={profileImage ? { uri: profileImage } : defaultProfileImage} 
+                    style={styles.profileImage(theme)}
+                />
                 <TouchableOpacity style={styles.cameraButton(theme)} onPress={handleImagePicker}>
                     <Ionicons name="camera" size={18} color={theme.textDark} />
                 </TouchableOpacity>
@@ -214,41 +198,57 @@ const EditProfileScreen = ({ appLanguage }) => {
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('publicInfo')}</Text>
-            <InfoInput label={t('firstName')} value={firstName} onChangeText={setFirstName} theme={theme} />
-            <InfoInput label={t('lastName')} value={lastName} onChangeText={setLastName} theme={theme} />
-            <View style={[styles.inputContainer(theme), styles.disabledInputContainer(theme)]}>
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('publicInfo')}</Text>
+            <InfoInput label={t('firstName')} value={firstName} onChangeText={setFirstName} theme={theme} isRTL={isRTL} />
+            <InfoInput label={t('lastName')} value={lastName} onChangeText={setLastName} theme={theme} isRTL={isRTL} />
+            
+            <View style={[styles.inputContainer(theme, isRTL), styles.disabledInputContainer(theme)]}>
                 <View style={{flex: 1}}>
-                    <Text style={styles.inputLabel(theme)}>{t('mail')}</Text>
-                    {/* ✅ تم التأكد إن قيمة الإيميل مربوطة بالـ State */}
-                    <TextInput style={[styles.textInput(theme), styles.disabledTextInput(theme)]} value={email} editable={false} />
+                    <Text style={styles.inputLabel(theme, isRTL)}>{t('mail')}</Text>
+                    <TextInput 
+                        style={[styles.textInput(theme, isRTL), styles.disabledTextInput(theme)]} 
+                        value={email} 
+                        editable={false} 
+                        writingDirection={isRTL ? 'ltr' : 'rtl'}
+                    />
                 </View>
                 <Ionicons name="lock-closed-outline" size={22} color={theme.textGray} />
             </View>
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('physicalMetrics')}</Text>
-            <OptionSelector label={t('gender')} options={[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }]} selectedValue={gender} onSelect={setGender} theme={theme} />
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('physicalMetrics')}</Text>
+            <OptionSelector label={t('gender')} options={[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }]} selectedValue={gender} onSelect={setGender} theme={theme} isRTL={isRTL} />
             
-            <TouchableOpacity style={styles.inputContainer(theme)} onPress={() => setShowDatePicker(true)}>
+            {/* ✅ تم تعديل هذا الجزء ليظهر التاريخ بشكل ثابت */}
+            {/* ✅ جزء التاريخ المعدل ليظهر الرقم على اليسار مثل البقية */}
+            <TouchableOpacity style={styles.inputContainer(theme, isRTL)} onPress={() => setShowDatePicker(true)}>
                 <View style={{flex: 1}}>
-                    <Text style={styles.inputLabel(theme)}>{t('dob')}</Text>
-                    <Text style={styles.textInput(theme)}>{birthDate.toLocaleDateString(activeLanguage === 'ar' ? 'ar-EG' : 'en-GB')}</Text>
+                    <Text style={styles.inputLabel(theme, isRTL)}>{t('dob')}</Text>
+                    <Text 
+                        style={[
+                            styles.textInput(theme, isRTL), 
+                            { textAlign: isRTL ? 'left' : 'right' } // إجبار النص يكون يسار في الإنجليزي
+                        ]} 
+                        // تم تعديل هذا السطر ليكون LTR في الإنجليزي
+                        writingDirection={isRTL ? 'rtl' : 'ltr'}
+                    >
+                        {formatDate(birthDate)}
+                    </Text>
                 </View>
                 <Ionicons name="calendar-outline" size={22} color={theme.textGray} />
             </TouchableOpacity>
             {showDatePicker && <DateTimePicker value={birthDate} mode="date" display="spinner" onChange={onDateChange} locale={activeLanguage} />}
             
-            <InfoInput label={t('height')} value={height} onChangeText={setHeight} keyboardType="numeric" theme={theme} />
-            <InfoInput label={t('currentWeight')} value={weight} onChangeText={setWeight} keyboardType="numeric" theme={theme} />
+            <InfoInput label={t('height')} value={height} onChangeText={setHeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />
+            <InfoInput label={t('currentWeight')} value={weight} onChangeText={setWeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />
         </View>
 
         <View style={styles.formSection}>
-            <Text style={styles.sectionTitle(theme)}>{t('goals')}</Text>
-            <OptionSelector label={t('mainGoal')} options={[{ label: t('lose'), value: 'lose' }, { label: t('maintain'), value: 'maintain' }, { label: t('gain'), value: 'gain' }]} selectedValue={goal} onSelect={setGoal} theme={theme} />
-            {goal !== 'maintain' && <InfoInput label={t('targetWeight')} value={targetWeight} onChangeText={setTargetWeight} keyboardType="numeric" theme={theme} />}
-            <OptionSelector label={t('activityLevel')} options={[{ label: t('sedentary'), value: 'sedentary' }, { label: t('light'), value: 'light' }, { label: t('active'), value: 'active' }, { label: t('very_active'), value: 'very_active' }]} selectedValue={activityLevel} onSelect={setActivityLevel} theme={theme} />
+            <Text style={styles.sectionTitle(theme, isRTL)}>{t('goals')}</Text>
+            <OptionSelector label={t('mainGoal')} options={[{ label: t('lose'), value: 'lose' }, { label: t('maintain'), value: 'maintain' }, { label: t('gain'), value: 'gain' }]} selectedValue={goal} onSelect={setGoal} theme={theme} isRTL={isRTL} />
+            {goal !== 'maintain' && <InfoInput label={t('targetWeight')} value={targetWeight} onChangeText={setTargetWeight} keyboardType="numeric" theme={theme} isRTL={isRTL} />}
+            <OptionSelector label={t('activityLevel')} options={[{ label: t('sedentary'), value: 'sedentary' }, { label: t('light'), value: 'light' }, { label: t('active'), value: 'active' }, { label: t('very_active'), value: 'very_active' }]} selectedValue={activityLevel} onSelect={setActivityLevel} theme={theme} isRTL={isRTL} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -257,12 +257,20 @@ const EditProfileScreen = ({ appLanguage }) => {
 
 const styles = {
   container: (theme) => ({ flex: 1, backgroundColor: theme.background }), 
-  header: (theme) => ({ 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border 
+  
+  header: (theme, isRTL) => ({ 
+    flexDirection: isRTL ? 'row' : 'row-reverse', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 15, 
+    paddingVertical: 10, 
+    backgroundColor: theme.background, 
+    borderBottomWidth: 1, 
+    borderBottomColor: theme.border 
   }), 
   headerButton: { padding: 5, width: 40, alignItems: 'center' },
   headerTitle: (theme) => ({ fontSize: 20, fontWeight: 'bold', color: theme.textDark }), 
+  
   profileSection: { alignItems: 'center', marginVertical: 20 }, 
   profileImageContainer: { position: 'relative' }, 
   profileImage: (theme) => ({ width: 100, height: 100, borderRadius: 50, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border }), 
@@ -270,31 +278,56 @@ const styles = {
     position: 'absolute', bottom: 0, right: 0,
     backgroundColor: theme.surface, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.border, elevation: 3 
   }), 
+  
   formSection: { paddingHorizontal: 20, marginBottom: 10, paddingTop: 10 }, 
-  sectionTitle: (theme) => ({ 
-    fontSize: 13, color: theme.textGray, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', 
-    textAlign: 'left' 
+  
+  sectionTitle: (theme, isRTL) => ({ 
+    fontSize: 13, 
+    color: theme.textGray, 
+    fontWeight: '600', 
+    marginBottom: 15, 
+    textTransform: 'uppercase', 
+    textAlign: isRTL ? 'left' : 'right' 
   }), 
-  inputContainer: (theme) => ({ 
-    backgroundColor: theme.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 15, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: theme.border 
+  
+  inputContainer: (theme, isRTL) => ({ 
+    backgroundColor: theme.surface, 
+    borderRadius: 12, 
+    paddingVertical: 12, 
+    paddingHorizontal: 16, 
+    marginBottom: 15, 
+    flexDirection: isRTL ? 'row' : 'row-reverse', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: theme.border 
   }), 
-  inputLabel: (theme) => ({ 
-    fontSize: 12, color: theme.textGray, marginBottom: 4, 
-    textAlign: 'left' 
+  
+  inputLabel: (theme, isRTL) => ({ 
+    fontSize: 12, 
+    color: theme.textGray, 
+    marginBottom: 4, 
+    textAlign: isRTL ? 'left' : 'right' 
   }), 
-  textInput: (theme) => ({ 
-    fontSize: 16, fontWeight: '600', color: theme.textDark, padding: 0, 
-    textAlign: 'left' 
+  
+  textInput: (theme, isRTL) => ({ 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: theme.textDark, 
+    padding: 0, 
+    textAlign: isRTL ? 'right' : 'left' 
   }), 
+  
   disabledInputContainer: (theme) => ({ backgroundColor: theme.disabledBackground }), 
   disabledTextInput: (theme) => ({ color: theme.textGray }), 
+  
   optionContainer: { marginBottom: 15 }, 
-  optionsWrapper: { 
-    flexDirection: 'row', 
+  
+  optionsWrapper: (isRTL) => ({ 
+    flexDirection: isRTL ? 'row' : 'row-reverse', 
     gap: 8 
-  }, 
+  }), 
+  
   optionButton: (theme) => ({ flex: 1, paddingVertical: 12, paddingHorizontal: 5, borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface }),
   optionButtonSelected: (theme) => ({ backgroundColor: theme.primary, borderColor: theme.primary }), 
   optionText: (theme) => ({ color: theme.textDark, fontWeight: '600', fontSize: 14 }), 

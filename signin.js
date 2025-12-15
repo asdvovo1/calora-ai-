@@ -238,7 +238,7 @@ const SignInScreen = ({ navigation, appLanguage }) => {
 // Styles
 const styles = {
     safeArea: (theme) => ({ flex: 1, backgroundColor: theme.background }),
-    
+
     header: (theme, isRTL) => ({ 
         backgroundColor: theme.primary, 
         height: height * 0.35, 
@@ -251,30 +251,20 @@ const styles = {
         position: 'relative', 
         overflow: 'hidden' 
     }),
-    
-    // صورة الضل العلوية (Top Leaf):
-    // تم التعديل: في العربي تروح يسار (left) وبقلبها (scaleX: -1) عشان شكلها يظبط
+
     headerImageTop: (isRTL) => ({
         position: 'absolute',
         top: -60,
-        ...(isRTL 
-            ? { left: -70, transform: [{ scaleX: -1 }] } 
-            : { right: -70 }
-        ),
+        ...(isRTL ? { left: -70, transform: [{ scaleX: -1 }] } : { right: -70 }),
         width: 290,
         height: 290,
         opacity: 0.8 
     }),
-    
-    // صورة الشجرة السفلية:
-    // في العربي تروح يمين (right)
+
     headerImageBottom: (isRTL) => ({ 
         position: 'absolute', 
         bottom: -7, 
-        ...(isRTL 
-            ? { right: 20, transform: [{ scaleX: -1 }] } 
-            : { left: -20 }
-        ), 
+        ...(isRTL ? { right: 20, transform: [{ scaleX: -1 }] } : { left: 0 }), 
         width: 130, 
         height: 130, 
         zIndex: 2 
@@ -289,23 +279,29 @@ const styles = {
         includeFontPadding: false, 
         lineHeight: 50, 
     }),
-    
+
     subtitle: (theme, isRTL) => ({ 
         fontSize: 18, 
         color: theme.headerText, 
-        marginTop: -45, 
         textAlign: isRTL ? 'left' : 'right',
         width: '100%',
         includeFontPadding: false,
+        marginTop: 10, 
     }),
-    
+
     formContainer: { flex: 1, paddingHorizontal: 20, marginTop: -40, zIndex: 1 },
+    
     card: (theme) => ({ backgroundColor: theme.card, borderRadius: 30, paddingVertical: 30, paddingHorizontal: 25, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 15, marginBottom: 20 }),
-    
+
     loginTitle: (theme) => ({ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 20, textAlign: 'center' }),
-    
+
+    // ---------------------------------------------------------
+    // (1) عكسنا هنا زي ما طلبت
+    // ---------------------------------------------------------
     inputContainer: (theme, isRTL) => ({ 
-        flexDirection: isRTL ? 'row-reverse' : 'row', 
+        // عربي: row
+        // إنجليزي: row-reverse
+        flexDirection: isRTL ? 'row' : 'row-reverse', 
         alignItems: 'center', 
         backgroundColor: theme.inputBackground, 
         borderRadius: 15, 
@@ -315,18 +311,17 @@ const styles = {
         borderColor: theme.borderColor, 
         height: 55 
     }),
-    
-    inputIcon: (isRTL) => ({ [isRTL ? 'marginLeft' : 'marginRight']: 15 }),
-    
+
+    // عكسنا المسافات برضه عشان تظبط مع العكس الجديد
+    inputIcon: (isRTL) => ({ [isRTL ? 'marginRight' : 'marginLeft']: 15 }),
+
     input: (theme, isRTL) => ({ 
         flex: 1, 
         fontSize: 16, 
         color: theme.textPrimary, 
-        textAlign: isRTL ? 'left' : 'right' 
+        textAlign: isRTL ? 'right' : 'left' 
     }),
-    
-    // تم التعديل هنا: محاذاة "نسيت كلمة المرور"
-    // في العربي تصبح يمين (right) بدلاً من يسار
+
     forgotPassword: (theme, isRTL) => ({ 
         textAlign: isRTL ? 'right' : 'left', 
         color: theme.primary, 
@@ -334,28 +329,33 @@ const styles = {
         fontWeight: '600', 
         marginVertical: 10 
     }),
-    
+
     loginButton: (theme) => ({ backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 30, alignItems: 'center', marginTop: 8 }),
     loginButtonText: (theme) => ({ color: theme.headerText, fontSize: 18, fontWeight: 'bold' }),
-    
-    dividerContainer: (isRTL) => ({ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginVertical: 20 }),
+
+    // عكسنا هنا كمان عشان يمشوا مع بعض
+    dividerContainer: (isRTL) => ({ flexDirection: isRTL ? 'row' : 'row-reverse', alignItems: 'center', marginVertical: 20 }),
     dividerLine: (theme) => ({ flex: 1, height: 1, backgroundColor: theme.borderColor }),
     dividerText: (theme) => ({ marginHorizontal: 15, color: theme.textSecondary }),
-    
+
     socialContainer: { flexDirection: 'row', justifyContent: 'center', gap: 25 },
     socialButton: (theme) => ({ alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: 15, borderWidth: 1, borderColor: theme.borderColor, backgroundColor: theme.card }),
     socialIconImage: { width: 28, height: 28 },
-    
-        signUpContainer: (isRTL) => ({ 
-        // التعديل هنا: جعلناها 'row' دائماً (حتى في العربي) ليكون الترتيب: النص (يمين) ثم الرابط (يسار)
-        flexDirection: 'row', 
+
+    // ---------------------------------------------------------
+    // (2) الجزء اللي تحت خالص (Sign Up) عكسنا الشرط
+    // ---------------------------------------------------------
+    signUpContainer: (isRTL) => ({ 
+        // عربي: row
+        // إنجليزي: row-reverse
+        flexDirection: isRTL ? 'row' : 'row-reverse', 
         justifyContent: 'center', 
         alignItems: 'center', 
         marginTop: 20 
     }),
 
     signUpText: (theme) => ({ color: theme.textSecondary, fontSize: 14 }),
-    signUpLink: (theme) => ({ color: theme.primary, fontWeight: 'bold' }),
+    signUpLink: (theme) => ({ color: theme.primary, fontWeight: 'bold', marginHorizontal: 5 }),
 };
 
 
